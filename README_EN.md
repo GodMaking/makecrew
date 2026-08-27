@@ -15,3 +15,5 @@ Use the task card for routing, a project context pack for stable memory, and a d
 See `docs/` for architecture, routing, and memory rules. Templates are in `templates/`; role prompts are in `roles/`.
 
 Start with `docs/getting-started.md`, copy prompts from `docs/prompt-pack.md`, and choose an adapter from `docs/platform-adapters.md`. The system is model- and vendor-agnostic.
+
+For a complete walkthrough, see `examples/first-task/README.md`. Contributions and security boundaries are documented in `CONTRIBUTING.md` and `SECURITY.md`.

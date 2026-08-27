@@ -7,3 +7,4 @@
 - Added routing, memory, architecture, and cost-control guidance.
 - Added website, content-growth, and knowledge-base examples.
 - Added a five-minute setup guide, copy-ready prompt pack, platform adapters, and FAQ.
+- Added an employee registry, first-task walkthrough, contribution guide, and security notes.

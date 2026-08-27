@@ -10,6 +10,16 @@
 - 重要交付物经过验收，失败原因可追踪、可复用
 - 小任务直达员工，大任务才启用完整流程，控制 Token 成本
 
+## 你将得到什么
+
+| 内容 | 用途 |
+|---|---|
+| 角色提示词 | 直接创建 CEO、项目主管、专业员工和验收员 |
+| 任务卡 | 统一目标、负责人、依赖、交付物和验收标准 |
+| 上下文包 | 保存长期项目的稳定记忆，减少重复说明 |
+| 差量交接 | 只同步新增结论、证据、风险和下一步 |
+| 路由与门禁 | 决定何时直达、何时组队、何时需要用户确认 |
+
 ## 运行模型
 
 ```text
@@ -31,6 +41,8 @@
 5. 有代码、内容、设计或发布成果时，按任务类型完成验收后再交付。
 
 第一次使用请看 [`docs/getting-started.md`](docs/getting-started.md)；可复制提示词见 [`docs/prompt-pack.md`](docs/prompt-pack.md)，平台接入见 [`docs/platform-adapters.md`](docs/platform-adapters.md)。
+
+想快速体验完整闭环，可直接运行 [`examples/first-task/README.md`](examples/first-task/README.md)。
 
 ## 路由规则
 
@@ -56,6 +68,7 @@
 - `templates/`：任务卡、上下文包、差量交接模板
 - `examples/`：网站开发、内容增长、知识库整理示例
 - `docs/`：架构、记忆模型和路由规则
+- `CONTRIBUTING.md`、`SECURITY.md`：贡献规范和安全边界
 
 ## 适合谁
 
