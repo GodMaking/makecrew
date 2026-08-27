@@ -44,6 +44,31 @@
 
 想快速体验完整闭环，可直接运行 [`examples/first-task/README.md`](examples/first-task/README.md)。
 
+## 可运行 MVP
+
+项目自带一个无第三方依赖的规则路由器，适合先验证工作流，再接入具体模型或工具。需要 Python 3.10 或更高版本。
+
+```bash
+# 在仓库目录执行
+python -m ai_company_os.cli "开发网站并准备上线，同时研究用户并写宣传文案" --project demo-site
+python -m ai_company_os.web
+```
+
+第二条命令会启动本地演示页，打开 `http://127.0.0.1:8787`，输入任务即可看到路由、协作组、验收门禁和 Token 预算。路由器不上传任务内容，也不需要 API Key。
+
+程序入口：
+
+- `ai_company_os.router.route_task(task, project="")`：返回可序列化的协作计划
+- `ai_company_os.cli`：命令行 JSON 输出
+- `ai_company_os.web`：本地可视化演示
+- `tests/`：路由行为测试
+
+### 当前能力边界
+
+MVP 负责把自然语言任务转换成可检查的协作计划：路由、岗位、并行子任务、验收门禁和预算。它不绑定模型、不上传任务文本，也不会假装已经替你调用外部员工。要执行真实工作，可把返回结果交给你使用的模型/Agent 平台，或按 `docs/platform-adapters.md` 接入自己的工具层。
+
+后续版本可以在这个稳定核心上增加模型适配器、任务持久化、员工状态同步和真实的并行执行器。
+
 ## 路由规则
 
 - 单一、明确、低风险：直接找专业员工。
@@ -69,6 +94,7 @@
 - `examples/`：网站开发、内容增长、知识库整理示例
 - `docs/`：架构、记忆模型和路由规则
 - `CONTRIBUTING.md`、`SECURITY.md`：贡献规范和安全边界
+- `ai_company_os/`、`tests/`：可运行 MVP 与测试
 
 ## 适合谁
 

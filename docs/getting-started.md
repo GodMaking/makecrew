@@ -2,6 +2,25 @@
 
 这套方法不依赖特定模型、插件或编程语言。你只需要能创建几个独立对话，或使用支持多个 Agent 的工具。
 
+## 运行本地 MVP
+
+需要 Python 3.10 或更高版本。直接在仓库目录运行：
+
+```bash
+python -m ai_company_os.cli "开发网站并准备上线，同时研究用户并写宣传文案"
+python -m ai_company_os.web
+```
+
+也可以安装成命令：
+
+```bash
+python -m pip install -e .
+ai-company-route "整理竞品资料并写一页结论"
+ai-company-demo
+```
+
+MVP 使用本地规则生成计划，不上传任务内容。接入真实模型或工具时，再按 `docs/platform-adapters.md` 配置对应员工。
+
 ## 方式 A：三个独立对话
 
 1. 新建一个对话，粘贴 `roles/ceo.md`，命名为“CEO 总控”。
