@@ -13,3 +13,5 @@ User -> CEO -> project leads -> specialists (cross-project decision)
 Use the task card for routing, a project context pack for stable memory, and a delta handoff for collaboration. Keep private conversations, credentials, local paths, and business data out of this repository.
 
 See `docs/` for architecture, routing, and memory rules. Templates are in `templates/`; role prompts are in `roles/`.
+
+Start with `docs/getting-started.md`, copy prompts from `docs/prompt-pack.md`, and choose an adapter from `docs/platform-adapters.md`. The system is model- and vendor-agnostic.

@@ -6,3 +6,4 @@
 - Added task, context, and delta-handoff templates.
 - Added routing, memory, architecture, and cost-control guidance.
 - Added website, content-growth, and knowledge-base examples.
+- Added a five-minute setup guide, copy-ready prompt pack, platform adapters, and FAQ.

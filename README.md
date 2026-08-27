@@ -30,6 +30,8 @@
 4. 跨员工传递只使用 `templates/handoff.md`，发送结论和差量，不广播完整历史。
 5. 有代码、内容、设计或发布成果时，按任务类型完成验收后再交付。
 
+第一次使用请看 [`docs/getting-started.md`](docs/getting-started.md)；可复制提示词见 [`docs/prompt-pack.md`](docs/prompt-pack.md)，平台接入见 [`docs/platform-adapters.md`](docs/platform-adapters.md)。
+
 ## 路由规则
 
 - 单一、明确、低风险：直接找专业员工。
@@ -54,6 +56,10 @@
 - `templates/`：任务卡、上下文包、差量交接模板
 - `examples/`：网站开发、内容增长、知识库整理示例
 - `docs/`：架构、记忆模型和路由规则
+
+## 适合谁
+
+个人开发者、独立创作者、小团队和需要管理多个长期项目的人。它提供的是一套可迁移的工作方法，不绑定某个模型或服务商。
 
 ## License
 
