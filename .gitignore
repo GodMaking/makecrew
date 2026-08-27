@@ -15,6 +15,8 @@ node_modules/
 dist/
 build/
 coverage/
+__pycache__/
+*.py[cod]
 
 # Private task and memory exports
 private/
