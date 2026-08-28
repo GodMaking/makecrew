@@ -15,6 +15,12 @@ Use this skill when a user wants AI to manage a team of AI employees, coordinate
 4. Run `makecrew audit --tools TOOL1,TOOL2` and report missing capabilities before execution.
 5. Preserve existing project memory and employee conversations; add only missing files.
 
+The minimum operating loop is three core roles: `CEO-001`, `PM-001`, and
+`QA-001`. Specialist roles are optional templates. Let the user choose the
+count per project; duplicate a template when parallel capacity is useful, or
+add a custom profile with `makecrew add-employee`. Never create a large fixed
+roster just to make the team look complete.
+
 ## Operating loop
 
 Route the task, assign a unique employee ID, pass the smallest useful context, record task state and usage, collect evidence, and send a delta handoff. Public or irreversible actions require user confirmation.

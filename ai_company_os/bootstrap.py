@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from .router import EMPLOYEE_PROFILES
+from .router import CORE_EMPLOYEE_PROFILES, EMPLOYEE_PROFILES, EmployeeProfile
 
 
 KNOWN_TOOLS = (
@@ -21,7 +21,11 @@ KNOWN_TOOLS = (
 def audit_tools(available: list[str] | tuple[str, ...] | set[str]) -> dict[str, list[str]]:
     """Compare host tools with the capabilities used by the default profiles."""
     available_set = {item.strip() for item in available if item and item.strip()}
-    required = sorted({tool for profile in EMPLOYEE_PROFILES.values() for tool in profile.tools})
+    required = sorted({
+        tool
+        for profile in [*CORE_EMPLOYEE_PROFILES.values(), *EMPLOYEE_PROFILES.values()]
+        for tool in profile.tools
+    })
     return {
         "available": sorted(available_set),
         "required": required,
@@ -50,7 +54,7 @@ def initialize_workspace(base_dir: str | Path, *, project: str = "main") -> dict
             path.write_text(content, encoding="utf-8")
             created.append(str(path.relative_to(root)))
 
-    registry = {
+    default_registry = {
         profile.employee_id: {
             "name": profile.name,
             "department": profile.department,
@@ -58,11 +62,69 @@ def initialize_workspace(base_dir: str | Path, *, project: str = "main") -> dict
             "tools": list(profile.tools),
             "memory_scope": profile.memory_scope,
             "status": profile.status,
+            "kind": profile.kind,
         }
-        for profile in EMPLOYEE_PROFILES.values()
+        for profile in [*CORE_EMPLOYEE_PROFILES.values(), *EMPLOYEE_PROFILES.values()]
     }
     registry_path = crew_dir / "employee-registry.json"
     if not registry_path.exists():
-        registry_path.write_text(json.dumps(registry, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        registry_path.write_text(json.dumps(default_registry, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         created.append(str(registry_path.relative_to(root)))
+    else:
+        # Upgrade an existing workspace additively. User-defined entries and
+        # their settings take precedence over the built-in defaults.
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+        changed = False
+        for employee_id, profile in default_registry.items():
+            if employee_id not in registry:
+                registry[employee_id] = profile
+                changed = True
+            elif "kind" not in registry[employee_id]:
+                registry[employee_id]["kind"] = profile["kind"]
+                changed = True
+        if changed:
+            registry_path.write_text(json.dumps(registry, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return {"root": str(root), "project": project_name, "created_count": str(len(created))}
+
+
+def register_employee(base_dir: str | Path, profile: EmployeeProfile | dict) -> dict[str, str]:
+    """Add one user-selected employee without replacing core roles or templates.
+
+    The registry is intentionally additive. Existing project memory and role
+    definitions remain untouched, while a custom employee gets the same
+    capability contract as the built-in profiles.
+    """
+    root = Path(base_dir).expanduser().resolve()
+    registry_path = root / ".makecrew" / "employee-registry.json"
+    if not registry_path.exists():
+        initialize_workspace(root)
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    if isinstance(profile, EmployeeProfile):
+        record = {
+            "name": profile.name,
+            "department": profile.department,
+            "skills": list(profile.skills),
+            "tools": list(profile.tools),
+            "memory_scope": profile.memory_scope,
+            "status": profile.status,
+            "kind": "custom",
+        }
+        employee_id = profile.employee_id
+    else:
+        employee_id = str(profile.get("employee_id", "")).strip()
+        record = {
+            "name": str(profile.get("name", "")).strip(),
+            "department": str(profile.get("department", "")).strip(),
+            "skills": list(profile.get("skills", [])),
+            "tools": list(profile.get("tools", [])),
+            "memory_scope": str(profile.get("memory_scope", "project")),
+            "status": str(profile.get("status", "active")),
+            "kind": "custom",
+        }
+    if not employee_id or not record["name"] or not record["department"]:
+        raise ValueError("自定义员工至少需要 employee_id、name 和 department")
+    if employee_id in CORE_EMPLOYEE_PROFILES or employee_id in registry:
+        raise ValueError(f"员工 ID 已存在或属于核心岗位：{employee_id}")
+    registry[employee_id] = record
+    registry_path.write_text(json.dumps(registry, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return {"employee_id": employee_id, "kind": "custom", "registry": str(registry_path)}

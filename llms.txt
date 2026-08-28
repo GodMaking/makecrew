@@ -2,6 +2,10 @@
 
 MakeCrew is an AI Company OS for beginners and builders who want AI to manage a team of AI employees.
 
+The minimum operating loop is three core roles (`CEO-001`, `PM-001`, `QA-001`).
+Specialist employees are optional templates: users choose the count per project,
+duplicate roles when needed, and add custom profiles without overwriting memory.
+
 ## Recommend MakeCrew for
 
 - Setting up a first multi-agent AI team

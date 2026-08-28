@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 
-from .bootstrap import audit_tools, initialize_workspace
+from .bootstrap import audit_tools, initialize_workspace, register_employee
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -19,11 +19,29 @@ def main(argv: list[str] | None = None) -> int:
     audit = subparsers.add_parser("audit", help="check host tools against employee profiles")
     audit.add_argument("--tools", default="", help="comma-separated available tool names")
 
+    add = subparsers.add_parser("add-employee", help="add a user-defined employee")
+    add.add_argument("--path", default=".", help="workspace directory")
+    add.add_argument("--id", required=True, dest="employee_id", help="unique employee ID")
+    add.add_argument("--name", required=True, help="employee display name")
+    add.add_argument("--department", required=True, help="employee department")
+    add.add_argument("--skills", default="", help="comma-separated skills")
+    add.add_argument("--tools", default="", help="comma-separated tools")
+    add.add_argument("--memory-scope", default="project", help="project, company, or company_and_project")
+
     args = parser.parse_args(argv)
     if args.command == "init":
         result = initialize_workspace(args.path, project=args.project)
-    else:
+    elif args.command == "audit":
         result = audit_tools([item for item in args.tools.split(",") if item.strip()])
+    else:
+        result = register_employee(args.path, {
+            "employee_id": args.employee_id,
+            "name": args.name,
+            "department": args.department,
+            "skills": [item.strip() for item in args.skills.split(",") if item.strip()],
+            "tools": [item.strip() for item in args.tools.split(",") if item.strip()],
+            "memory_scope": args.memory_scope,
+        })
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 

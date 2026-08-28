@@ -1,6 +1,7 @@
 import unittest
 import threading
 import tempfile
+import json
 from pathlib import Path
 import urllib.request
 from urllib.parse import quote
@@ -8,7 +9,7 @@ from urllib.parse import quote
 from ai_company_os.router import route_task
 from ai_company_os.task_state import TaskLedger, TaskStatus
 from ai_company_os.learning import LearningEngine, ProposalStatus
-from ai_company_os.bootstrap import initialize_workspace, audit_tools
+from ai_company_os.bootstrap import initialize_workspace, audit_tools, register_employee
 from ai_company_os.web import render_result
 from ai_company_os.web import Handler
 from http.server import ThreadingHTTPServer
@@ -23,6 +24,7 @@ class RouteTaskTests(unittest.TestCase):
         self.assertIn("required_skills", assignment)
         self.assertIn("tools", assignment)
         self.assertEqual(assignment["status"], "active")
+        self.assertEqual(assignment["kind"], "specialist_template")
 
     def test_route_exposes_project_memory_and_execution_policy(self):
         result = route_task("开发网站", project="demo-site")
@@ -30,6 +32,8 @@ class RouteTaskTests(unittest.TestCase):
         self.assertEqual(result["project_memory"], "demo-site")
         self.assertEqual(result["execution_policy"]["resume_on_restart"], True)
         self.assertIn("approval_required_for", result["execution_policy"])
+        self.assertEqual(result["core_roles"], ["CEO", "项目主管", "验收员"])
+        self.assertEqual(result["verification_contract"]["employee_id"], "QA-001")
 
     def test_single_specialist_task_routes_directly(self):
         result = route_task("修复登录页面的表单校验")
@@ -65,6 +69,7 @@ class RouteTaskTests(unittest.TestCase):
         page = render_result("开发网站并准备上线，同时研究用户", "demo-site")
 
         self.assertIn("并行任务", page)
+        self.assertIn("岗位底座", page)
         self.assertIn("项目主管", page)
         self.assertIn("构建或测试结果", page)
         self.assertIn("ENG-001", page)
@@ -159,6 +164,10 @@ class BootstrapTests(unittest.TestCase):
             self.assertTrue(Path(directory, ".makecrew", "projects", "demo", "context-pack.md").exists())
             self.assertTrue(Path(directory, ".makecrew", "tasks.json").exists())
             self.assertTrue(Path(directory, ".makecrew", "learning.json").exists())
+            registry = json.loads(Path(directory, ".makecrew", "employee-registry.json").read_text(encoding="utf-8"))
+            self.assertEqual(registry["CEO-001"]["kind"], "core")
+            self.assertEqual(registry["QA-001"]["kind"], "core")
+            self.assertEqual(registry["ENG-001"]["kind"], "specialist_template")
 
     def test_audit_tools_reports_missing_capabilities(self):
         report = audit_tools(["filesystem", "shell"])
@@ -166,6 +175,38 @@ class BootstrapTests(unittest.TestCase):
         self.assertIn("browser", report["missing"])
         self.assertIn("web_search", report["missing"])
         self.assertIn("filesystem", report["available"])
+
+    def test_custom_employee_is_additive_and_core_roles_are_protected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            initialize_workspace(directory)
+            result = register_employee(directory, {
+                "employee_id": "MKT-001",
+                "name": "增长员工",
+                "department": "增长",
+                "skills": ["渠道分析"],
+                "tools": ["web_search"],
+            })
+            registry = json.loads(Path(directory, ".makecrew", "employee-registry.json").read_text(encoding="utf-8"))
+
+            self.assertEqual(result["kind"], "custom")
+            self.assertEqual(registry["MKT-001"]["kind"], "custom")
+            with self.assertRaises(ValueError):
+                register_employee(directory, {"employee_id": "CEO-001", "name": "替换", "department": "管理"})
+
+    def test_existing_registry_upgrade_keeps_custom_entries(self):
+        with tempfile.TemporaryDirectory() as directory:
+            initialize_workspace(directory)
+            path = Path(directory, ".makecrew", "employee-registry.json")
+            registry = json.loads(path.read_text(encoding="utf-8"))
+            registry["LEGACY-001"] = {"name": "旧项目员工", "department": "项目", "status": "active"}
+            del registry["QA-001"]
+            path.write_text(json.dumps(registry, ensure_ascii=False), encoding="utf-8")
+
+            initialize_workspace(directory)
+            upgraded = json.loads(path.read_text(encoding="utf-8"))
+            self.assertIn("LEGACY-001", upgraded)
+            self.assertEqual(upgraded["CEO-001"]["kind"], "core")
+            self.assertEqual(upgraded["QA-001"]["kind"], "core")
 
 
 if __name__ == "__main__":

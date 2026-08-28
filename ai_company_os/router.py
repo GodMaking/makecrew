@@ -5,6 +5,11 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 
 
+# These roles are the smallest complete operating loop. Specialist roles are
+# templates only: a workspace may add zero, one, or many of each.
+CORE_ROLES = ("CEO", "项目主管", "验收员")
+
+
 DOMAIN_RULES = {
     "工程": ("工程员工", ("开发", "代码", "网站", "app", "应用", "测试", "部署", "修复", "登录", "页面", "接口")),
     "研究": ("研究员工", ("研究", "搜索", "调研", "分析", "资料", "竞品", "数据", "趋势")),
@@ -28,6 +33,23 @@ class EmployeeProfile:
     tools: tuple[str, ...]
     memory_scope: str
     status: str = "active"
+    kind: str = "specialist_template"
+
+
+CORE_EMPLOYEE_PROFILES = {
+    "CEO-001": EmployeeProfile(
+        "CEO-001", "CEO", "管理", ("目标澄清", "优先级", "资源分配"),
+        ("filesystem", "search"), "company_and_project", kind="core"
+    ),
+    "PM-001": EmployeeProfile(
+        "PM-001", "项目主管", "管理", ("拆解", "动态组队", "差量交接"),
+        ("filesystem", "search"), "project", kind="core"
+    ),
+    "QA-001": EmployeeProfile(
+        "QA-001", "验收员", "质量", ("验收", "证据核验", "质量门禁"),
+        ("filesystem", "browser", "search"), "project", kind="core"
+    ),
+}
 
 
 EMPLOYEE_PROFILES = {
@@ -49,6 +71,7 @@ class Assignment:
     tools: tuple[str, ...] = ()
     status: str = "active"
     memory_scope: str = "project"
+    kind: str = "specialist_template"
 
 
 def _domains_for(text: str) -> list[str]:
@@ -93,6 +116,7 @@ def _assignment(domain: str) -> Assignment:
         profile.tools,
         profile.status,
         profile.memory_scope,
+        profile.kind,
     )
 
 
@@ -136,6 +160,25 @@ def route_task(task: str, project: str = "") -> dict:
         "domains": domains,
         "parallel_tasks": parallel_tasks,
         "assignments": [asdict(item) for item in assignments],
+        "core_roles": list(CORE_ROLES),
+        "verification_contract": {
+            "employee_id": "QA-001",
+            "role": "验收员",
+            "required_checks": ["交付物存在", "证据可复核", "验收门禁通过"],
+            "independent": True,
+        },
+        "specialist_templates": [
+            {
+                "employee_id": profile.employee_id,
+                "name": profile.name,
+                "department": profile.department,
+                "skills": list(profile.skills),
+                "tools": list(profile.tools),
+                "memory_scope": profile.memory_scope,
+                "kind": profile.kind,
+            }
+            for profile in EMPLOYEE_PROFILES.values()
+        ],
         "project_memory": project or "未指定项目（执行前应建立项目上下文包）",
         "execution_policy": {
             "resume_on_restart": True,
