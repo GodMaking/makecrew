@@ -35,6 +35,15 @@ See `docs/` for architecture, routing, and memory rules. Templates are in `templ
 
 Start with `docs/getting-started.md`, copy prompts from `docs/prompt-pack.md`, and choose an adapter from `docs/platform-adapters.md`. The system is model- and vendor-agnostic.
 
+You can bootstrap a workspace and audit host tools:
+
+```bash
+makecrew init --path ./my-ai-workspace --project demo
+makecrew audit --tools filesystem,shell,browser,web_search
+```
+
+For platforms that support skills, use [`skills/makecrew/SKILL.md`](skills/makecrew/SKILL.md) as the standard entry point.
+
 For a complete walkthrough, see `examples/first-task/README.md`. Contributions and security boundaries are documented in `CONTRIBUTING.md` and `SECURITY.md`.
 
 ## Runnable MVP

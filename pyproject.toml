@@ -18,6 +18,7 @@ Repository = "https://github.com/GodMaking/makecrew"
 [project.scripts]
 ai-company-route = "ai_company_os.cli:main"
 ai-company-demo = "ai_company_os.web:serve"
+makecrew = "ai_company_os.bootstrap_cli:main"
 
 [tool.setuptools.packages.find]
 include = ["ai_company_os*"]

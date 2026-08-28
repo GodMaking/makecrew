@@ -93,6 +93,15 @@ MakeCrew 适合个人创作者、独立开发者、研究者、内容团队和�
 
 第一次使用请看 [`docs/getting-started.md`](docs/getting-started.md)；可复制提示词见 [`docs/prompt-pack.md`](docs/prompt-pack.md)，平台接入见 [`docs/platform-adapters.md`](docs/platform-adapters.md)。
 
+也可以先初始化工作区并检查宿主工具：
+
+```bash
+makecrew init --path ./my-ai-workspace --project demo
+makecrew audit --tools filesystem,shell,browser,web_search
+```
+
+面向支持 Skill 的平台，可读取 [`skills/makecrew/SKILL.md`](skills/makecrew/SKILL.md) 作为标准入口。
+
 想快速体验完整闭环，可直接运行 [`examples/first-task/README.md`](examples/first-task/README.md)。
 
 ## 可运行 MVP

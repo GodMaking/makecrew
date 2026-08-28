@@ -1,12 +1,14 @@
 import unittest
 import threading
 import tempfile
+from pathlib import Path
 import urllib.request
 from urllib.parse import quote
 
 from ai_company_os.router import route_task
 from ai_company_os.task_state import TaskLedger, TaskStatus
 from ai_company_os.learning import LearningEngine, ProposalStatus
+from ai_company_os.bootstrap import initialize_workspace, audit_tools
 from ai_company_os.web import render_result
 from ai_company_os.web import Handler
 from http.server import ThreadingHTTPServer
@@ -145,6 +147,25 @@ class LearningEngineTests(unittest.TestCase):
 
         rejected = engine.propose_from_scores("P-2", baseline=[4, 4], candidate=[3, 4])[0]
         self.assertEqual(rejected.status, ProposalStatus.REJECTED)
+
+
+class BootstrapTests(unittest.TestCase):
+    def test_initialize_workspace_creates_safe_ai_company_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = initialize_workspace(directory, project="demo")
+
+            self.assertEqual(result["project"], "demo")
+            self.assertTrue(Path(directory, ".makecrew", "company-memory.md").exists())
+            self.assertTrue(Path(directory, ".makecrew", "projects", "demo", "context-pack.md").exists())
+            self.assertTrue(Path(directory, ".makecrew", "tasks.json").exists())
+            self.assertTrue(Path(directory, ".makecrew", "learning.json").exists())
+
+    def test_audit_tools_reports_missing_capabilities(self):
+        report = audit_tools(["filesystem", "shell"])
+
+        self.assertIn("browser", report["missing"])
+        self.assertIn("web_search", report["missing"])
+        self.assertIn("filesystem", report["available"])
 
 
 if __name__ == "__main__":

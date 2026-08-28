@@ -3,5 +3,6 @@
 from .router import route_task
 from .task_state import TaskLedger, TaskStatus
 from .learning import LearningEngine, ProposalStatus
+from .bootstrap import audit_tools, initialize_workspace
 
-__all__ = ["route_task", "TaskLedger", "TaskStatus", "LearningEngine", "ProposalStatus"]
+__all__ = ["route_task", "TaskLedger", "TaskStatus", "LearningEngine", "ProposalStatus", "audit_tools", "initialize_workspace"]
