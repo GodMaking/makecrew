@@ -44,6 +44,14 @@ class RouteTaskTests(unittest.TestCase):
         self.assertEqual(result["parallel_tasks"], [])
         self.assertIn("构建或测试结果", result["acceptance_gates"])
 
+    def test_skill_task_routes_to_skill_employee(self):
+        result = route_task("制作一个可复用的 Skill，并验证 SKILL.md 的触发条件")
+
+        self.assertEqual(result["route"], "direct_worker")
+        self.assertEqual(result["lead"], "Skill员工")
+        self.assertEqual(result["assignments"][0]["employee_id"], "SKL-001")
+        self.assertIn("SKILL.md 可加载、触发条件和最小任务验证", result["acceptance_gates"])
+
     def test_multi_role_project_routes_to_project_lead(self):
         result = route_task("开发网站并准备上线，同时研究用户并写宣传文案")
 
@@ -169,6 +177,7 @@ class BootstrapTests(unittest.TestCase):
             self.assertEqual(registry["CEO-001"]["kind"], "core")
             self.assertEqual(registry["QA-001"]["kind"], "core")
             self.assertEqual(registry["ENG-001"]["kind"], "specialist_template")
+            self.assertEqual(registry["SKL-001"]["kind"], "specialist_template")
 
     def test_audit_tools_reports_missing_capabilities(self):
         report = audit_tools(["filesystem", "shell"])

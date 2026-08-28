@@ -16,6 +16,7 @@ DOMAIN_RULES = {
     "内容": ("内容员工", ("文案", "标题", "脚本", "宣传", "内容", "公众号", "小红书", "抖音", "视频")),
     "设计": ("设计员工", ("设计", "封面", "视觉", "logo", "界面", "ui", "配图")),
     "知识库": ("知识库员工", ("知识库", "整理", "归档", "索引", "书籍", "资料库")),
+    "技能": ("Skill员工", ("skill", "技能", "skill.md", "能力套件", "技能包", "插件能力")),
 }
 
 CEO_KEYWORDS = ("优先级", "预算", "战略", "季度", "跨项目", "投入产出", "资源分配", "方向")
@@ -58,6 +59,7 @@ EMPLOYEE_PROFILES = {
     "内容": EmployeeProfile("CON-001", "内容员工", "内容", ("文案", "脚本", "平台适配"), ("filesystem", "browser"), "project"),
     "设计": EmployeeProfile("DES-001", "设计员工", "设计", ("视觉", "界面", "素材"), ("imagegen", "filesystem", "browser"), "project"),
     "知识库": EmployeeProfile("KNO-001", "知识库员工", "知识库", ("整理", "索引", "引用"), ("filesystem", "search"), "company_and_project"),
+    "技能": EmployeeProfile("SKL-001", "Skill员工", "技能", ("技能设计", "SKILL.md", "触发验证"), ("filesystem", "search"), "company_and_project"),
 }
 
 
@@ -93,6 +95,8 @@ def _acceptance_gates(domains: list[str], text: str) -> list[str]:
         gates.append("目标尺寸预览和信息层级检查")
     if "知识库" in domains:
         gates.append("抽样引用准确性和处理范围")
+    if "技能" in domains:
+        gates.append("SKILL.md 可加载、触发条件和最小任务验证")
     if any(word in text for word in PUBLIC_ACTIONS):
         gates.append("用户确认公开或不可逆操作")
     return gates or ["目标、负责人和完成证据明确"]
@@ -106,6 +110,7 @@ def _assignment(domain: str) -> Assignment:
         "内容": "策略、标题/脚本和平台版本",
         "设计": "视觉方案、预览和可编辑素材",
         "知识库": "已处理范围、索引和待处理清单",
+        "技能": "Skill方案、SKILL.md 和触发验证结果",
     }
     return Assignment(
         profile.name,
