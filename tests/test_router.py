@@ -6,6 +6,7 @@ from urllib.parse import quote
 
 from ai_company_os.router import route_task
 from ai_company_os.task_state import TaskLedger, TaskStatus
+from ai_company_os.learning import LearningEngine, ProposalStatus
 from ai_company_os.web import render_result
 from ai_company_os.web import Handler
 from http.server import ThreadingHTTPServer
@@ -121,6 +122,29 @@ class TaskLedgerTests(unittest.TestCase):
         snapshot = ledger.snapshot(task.task_id)
         self.assertEqual(snapshot["usage"], {"tool_calls": 2, "rounds": 1})
         self.assertEqual(snapshot["budget_remaining"], {"tool_calls": 2, "rounds": 3})
+
+
+class LearningEngineTests(unittest.TestCase):
+    def test_failed_evaluations_create_reviewable_proposal(self):
+        engine = LearningEngine()
+        engine.record("T-1", employee_id="ENG-001", score=2, feedback="上线前缺少浏览器验证", root_cause="验收步骤遗漏")
+        engine.record("T-2", employee_id="ENG-001", score=1, feedback="重复修改同一问题", root_cause="没有先做最小复现")
+
+        proposals = engine.propose()
+
+        self.assertEqual(len(proposals), 1)
+        self.assertEqual(proposals[0].status, ProposalStatus.PROPOSED)
+        self.assertEqual(proposals[0].scope, "employee")
+        self.assertEqual(proposals[0].target, "ENG-001")
+        self.assertEqual(len(proposals[0].evidence_task_ids), 2)
+
+    def test_candidate_must_beat_baseline_before_approval(self):
+        engine = LearningEngine()
+        proposal = engine.propose_from_scores("P-1", baseline=[3, 4], candidate=[4, 4])[0]
+        self.assertEqual(proposal.status, ProposalStatus.APPROVED)
+
+        rejected = engine.propose_from_scores("P-2", baseline=[4, 4], candidate=[3, 4])[0]
+        self.assertEqual(rejected.status, ProposalStatus.REJECTED)
 
 
 if __name__ == "__main__":
