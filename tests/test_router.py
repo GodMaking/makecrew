@@ -1,15 +1,33 @@
 import unittest
 import threading
+import tempfile
 import urllib.request
 from urllib.parse import quote
 
 from ai_company_os.router import route_task
+from ai_company_os.task_state import TaskLedger, TaskStatus
 from ai_company_os.web import render_result
 from ai_company_os.web import Handler
 from http.server import ThreadingHTTPServer
 
 
 class RouteTaskTests(unittest.TestCase):
+    def test_assignment_includes_capability_contract(self):
+        result = route_task("开发网站并准备上线")
+
+        assignment = result["assignments"][0]
+        self.assertIn("employee_id", assignment)
+        self.assertIn("required_skills", assignment)
+        self.assertIn("tools", assignment)
+        self.assertEqual(assignment["status"], "active")
+
+    def test_route_exposes_project_memory_and_execution_policy(self):
+        result = route_task("开发网站", project="demo-site")
+
+        self.assertEqual(result["project_memory"], "demo-site")
+        self.assertEqual(result["execution_policy"]["resume_on_restart"], True)
+        self.assertIn("approval_required_for", result["execution_policy"])
+
     def test_single_specialist_task_routes_directly(self):
         result = route_task("修复登录页面的表单校验")
 
@@ -46,6 +64,8 @@ class RouteTaskTests(unittest.TestCase):
         self.assertIn("并行任务", page)
         self.assertIn("项目主管", page)
         self.assertIn("构建或测试结果", page)
+        self.assertIn("ENG-001", page)
+        self.assertIn("恢复策略", page)
 
     def test_local_http_demo_serves_a_plan(self):
         server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
@@ -61,6 +81,46 @@ class RouteTaskTests(unittest.TestCase):
         finally:
             server.shutdown()
             server.server_close()
+
+
+class TaskLedgerTests(unittest.TestCase):
+    def test_task_ledger_reloads_state_after_restart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = f"{directory}/tasks.json"
+            ledger = TaskLedger(path)
+            task = ledger.create("开发网站", project="demo", assignee="ENG-001", budget=4)
+            ledger.transition(task.task_id, TaskStatus.IN_PROGRESS, note="已开始")
+            ledger.record_usage(task.task_id, tool_calls=1)
+
+            restored = TaskLedger(path)
+            snapshot = restored.snapshot(task.task_id)
+            self.assertEqual(snapshot["status"], TaskStatus.IN_PROGRESS)
+            self.assertEqual(snapshot["usage"]["tool_calls"], 1)
+
+    def test_task_can_pause_and_resume_with_compact_state(self):
+        ledger = TaskLedger()
+        task = ledger.create("开发网站", project="demo-site", assignee="ENG-001", budget=10)
+
+        ledger.transition(task.task_id, TaskStatus.IN_PROGRESS, note="已完成页面骨架")
+        ledger.transition(task.task_id, TaskStatus.BLOCKED, note="等待域名配置")
+        resumed = ledger.resume(task.task_id)
+
+        self.assertEqual(resumed.status, TaskStatus.IN_PROGRESS)
+        snapshot = ledger.snapshot(task.task_id)
+        self.assertEqual(snapshot["project"], "demo-site")
+        self.assertEqual(snapshot["last_blocked_note"], "等待域名配置")
+        self.assertEqual(snapshot["event_count"], 3)
+
+    def test_task_rejects_invalid_transition_and_tracks_cost(self):
+        ledger = TaskLedger()
+        task = ledger.create("研究竞品", project="demo", assignee="RES-001", budget={"tool_calls": 4, "rounds": 4})
+
+        with self.assertRaises(ValueError):
+            ledger.transition(task.task_id, "unknown")
+        ledger.record_usage(task.task_id, tool_calls=2, rounds=1)
+        snapshot = ledger.snapshot(task.task_id)
+        self.assertEqual(snapshot["usage"], {"tool_calls": 2, "rounds": 1})
+        self.assertEqual(snapshot["budget_remaining"], {"tool_calls": 2, "rounds": 3})
 
 
 if __name__ == "__main__":

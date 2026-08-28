@@ -18,10 +18,37 @@ PUBLIC_ACTIONS = ("上线", "发布", "公开", "投放", "付款", "删除")
 
 
 @dataclass(frozen=True)
+class EmployeeProfile:
+    """The minimum capability contract used for deterministic routing."""
+
+    employee_id: str
+    name: str
+    department: str
+    skills: tuple[str, ...]
+    tools: tuple[str, ...]
+    memory_scope: str
+    status: str = "active"
+
+
+EMPLOYEE_PROFILES = {
+    "工程": EmployeeProfile("ENG-001", "工程员工", "工程", ("代码", "测试", "部署"), ("shell", "filesystem", "browser"), "project"),
+    "研究": EmployeeProfile("RES-001", "研究员工", "研究", ("检索", "来源核验", "分析"), ("web_search", "browser", "filesystem"), "project"),
+    "内容": EmployeeProfile("CON-001", "内容员工", "内容", ("文案", "脚本", "平台适配"), ("filesystem", "browser"), "project"),
+    "设计": EmployeeProfile("DES-001", "设计员工", "设计", ("视觉", "界面", "素材"), ("imagegen", "filesystem", "browser"), "project"),
+    "知识库": EmployeeProfile("KNO-001", "知识库员工", "知识库", ("整理", "索引", "引用"), ("filesystem", "search"), "company_and_project"),
+}
+
+
+@dataclass(frozen=True)
 class Assignment:
     role: str
     objective: str
     output: str
+    employee_id: str = ""
+    required_skills: tuple[str, ...] = ()
+    tools: tuple[str, ...] = ()
+    status: str = "active"
+    memory_scope: str = "project"
 
 
 def _domains_for(text: str) -> list[str]:
@@ -49,7 +76,7 @@ def _acceptance_gates(domains: list[str], text: str) -> list[str]:
 
 
 def _assignment(domain: str) -> Assignment:
-    worker = DOMAIN_RULES[domain][0]
+    profile = EMPLOYEE_PROFILES[domain]
     outputs = {
         "工程": "可运行实现、测试结果和变更说明",
         "研究": "结论、来源、日期和不确定性",
@@ -57,7 +84,16 @@ def _assignment(domain: str) -> Assignment:
         "设计": "视觉方案、预览和可编辑素材",
         "知识库": "已处理范围、索引和待处理清单",
     }
-    return Assignment(worker, f"完成任务中的{domain}部分", outputs[domain])
+    return Assignment(
+        profile.name,
+        f"完成任务中的{domain}部分",
+        outputs[domain],
+        profile.employee_id,
+        profile.skills,
+        profile.tools,
+        profile.status,
+        profile.memory_scope,
+    )
 
 
 def route_task(task: str, project: str = "") -> dict:
@@ -99,6 +135,14 @@ def route_task(task: str, project: str = "") -> dict:
         "lead": lead,
         "domains": domains,
         "parallel_tasks": parallel_tasks,
+        "assignments": [asdict(item) for item in assignments],
+        "project_memory": project or "未指定项目（执行前应建立项目上下文包）",
+        "execution_policy": {
+            "resume_on_restart": True,
+            "persist_task_state": True,
+            "approval_required_for": list(PUBLIC_ACTIONS),
+            "handoff_format": "delta_only",
+        },
         "acceptance_gates": _acceptance_gates(domains, task),
         "budget": budget,
         "requires_user_confirmation": requires_confirmation,
