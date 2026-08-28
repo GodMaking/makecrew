@@ -52,6 +52,9 @@ class RouteTaskTests(unittest.TestCase):
         self.assertEqual(result["assignments"][0]["employee_id"], "SKL-001")
         self.assertIn("SKILL.md 可加载、触发条件和最小任务验证", result["acceptance_gates"])
 
+    def test_skill_worker_contract_is_available(self):
+        self.assertTrue(Path(__file__).parents[1].joinpath("roles", "skill-worker.md").exists())
+
     def test_multi_role_project_routes_to_project_lead(self):
         result = route_task("开发网站并准备上线，同时研究用户并写宣传文案")
 
