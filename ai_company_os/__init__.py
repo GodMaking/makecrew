@@ -1,4 +1,4 @@
-"""AI Company OS local MVP."""
+"""MakeCrew local MVP: an AI Company OS for multi-agent teams."""
 
 from .router import route_task
 from .task_state import TaskLedger, TaskStatus

@@ -1,4 +1,8 @@
-# AI Company OS
+# MakeCrew
+
+> AI Company OS for Multi-Agent Teams
+
+让 AI 管理 AI 的数字团队操作系统。
 
 一人 AI 公司的轻量操作系统：专业员工负责深度工作，项目负责人负责协调，独立验收负责把关，CEO 只处理跨项目决策。
 

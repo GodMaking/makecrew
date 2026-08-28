@@ -1,4 +1,6 @@
-# AI Company OS
+# MakeCrew
+
+> AI Company OS for Multi-Agent Teams
 
 A lightweight operating system for a one-person AI company: specialists do deep work, project leads coordinate, independent reviewers verify, and the CEO handles cross-project decisions.
 

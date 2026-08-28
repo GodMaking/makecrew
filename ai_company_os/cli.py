@@ -10,7 +10,7 @@ from .router import route_task
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Route a task through AI Company OS")
+    parser = argparse.ArgumentParser(description="Route a task through MakeCrew")
     parser.add_argument("task", nargs="*", help="task description")
     parser.add_argument("--project", default="", help="project name")
     args = parser.parse_args(argv)

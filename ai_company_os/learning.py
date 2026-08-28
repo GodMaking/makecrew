@@ -1,4 +1,4 @@
-"""Evidence-based learning proposals for AI Company OS.
+"""Evidence-based learning proposals for MakeCrew.
 
 The engine records outcomes and proposes changes; applying a proposal remains an
 explicit integration step so existing role files stay intact.

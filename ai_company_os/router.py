@@ -1,4 +1,4 @@
-"""Rule-based task routing for the AI Company OS MVP."""
+"""Rule-based task routing for the MakeCrew MVP."""
 
 from __future__ import annotations
 

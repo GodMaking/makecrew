@@ -5,11 +5,15 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ai-company-os"
 version = "0.2.0"
-description = "A lightweight, model-agnostic multi-agent routing and collaboration framework"
+description = "MakeCrew: a lightweight, model-agnostic multi-agent routing and collaboration framework"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}
 authors = [{name = "AI Company OS contributors"}]
+
+[project.urls]
+Homepage = "https://github.com/GodMaking/makecrew"
+Repository = "https://github.com/GodMaking/makecrew"
 
 [project.scripts]
 ai-company-route = "ai_company_os.cli:main"

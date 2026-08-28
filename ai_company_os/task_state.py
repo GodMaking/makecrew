@@ -1,4 +1,4 @@
-"""Small, restart-friendly task ledger for the local AI Company OS MVP."""
+"""Small, restart-friendly task ledger for the local MakeCrew MVP."""
 
 from __future__ import annotations
 
