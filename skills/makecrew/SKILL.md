@@ -23,7 +23,7 @@ roster just to make the team look complete.
 
 ## Operating loop
 
-Route the task, assign a unique employee ID, pass the smallest useful context, record task state and usage, collect evidence, and send a delta handoff. Public or irreversible actions require user confirmation.
+Route the task, assign a unique employee ID, pass the smallest useful context, record task state and usage, collect evidence, and send a delta handoff. Use `CrewOrchestrator` (or an equivalent host adapter) to dispatch the payload to the real employee conversation. If no matching profile exists, create a temporary employee; promote only when repeated work justifies it. Public or irreversible actions require user confirmation.
 
 ## Learning loop
 

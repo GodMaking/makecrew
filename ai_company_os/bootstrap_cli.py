@@ -6,6 +6,7 @@ import argparse
 import json
 
 from .bootstrap import audit_tools, initialize_workspace, register_employee
+from .orchestrator import CrewOrchestrator
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -28,12 +29,17 @@ def main(argv: list[str] | None = None) -> int:
     add.add_argument("--tools", default="", help="comma-separated tools")
     add.add_argument("--memory-scope", default="project", help="project, company, or company_and_project")
 
+    dispatch = subparsers.add_parser("dispatch", help="route and dispatch a task")
+    dispatch.add_argument("task", nargs="+", help="task description")
+    dispatch.add_argument("--path", default=".", help="workspace directory")
+    dispatch.add_argument("--project", default="", help="project name")
+
     args = parser.parse_args(argv)
     if args.command == "init":
         result = initialize_workspace(args.path, project=args.project)
     elif args.command == "audit":
         result = audit_tools([item for item in args.tools.split(",") if item.strip()])
-    else:
+    elif args.command == "add-employee":
         result = register_employee(args.path, {
             "employee_id": args.employee_id,
             "name": args.name,
@@ -42,6 +48,8 @@ def main(argv: list[str] | None = None) -> int:
             "tools": [item.strip() for item in args.tools.split(",") if item.strip()],
             "memory_scope": args.memory_scope,
         })
+    else:
+        result = CrewOrchestrator(args.path).dispatch(" ".join(args.task), project=args.project)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 

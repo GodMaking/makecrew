@@ -13,6 +13,7 @@ from ai_company_os.bootstrap import initialize_workspace, audit_tools, register_
 from ai_company_os.web import render_result
 from ai_company_os.web import Handler
 from http.server import ThreadingHTTPServer
+from ai_company_os.orchestrator import CrewOrchestrator
 
 
 class RouteTaskTests(unittest.TestCase):
@@ -207,6 +208,50 @@ class BootstrapTests(unittest.TestCase):
             self.assertIn("LEGACY-001", upgraded)
             self.assertEqual(upgraded["CEO-001"]["kind"], "core")
             self.assertEqual(upgraded["QA-001"]["kind"], "core")
+
+
+class OrchestrationTests(unittest.TestCase):
+    def test_dispatch_prefers_existing_specialist_and_keeps_ceo_as_delegate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            initialize_workspace(directory, project="demo")
+            calls = []
+
+            def dispatcher(employee_id, payload):
+                calls.append((employee_id, payload))
+                return {"status": "completed", "summary": "已完成"}
+
+            result = CrewOrchestrator(directory, dispatcher=dispatcher).dispatch(
+                "修复登录页面的表单校验", project="demo"
+            )
+
+            self.assertEqual(result["dispatch_mode"], "existing")
+            self.assertEqual(result["executor_id"], "ENG-001")
+            self.assertEqual(result["ceo_action"], "delegate")
+            self.assertEqual(result["verification"]["employee_id"], "QA-001")
+            self.assertEqual(result["execution"]["status"], "completed")
+            self.assertEqual(calls[0][0], "ENG-001")
+
+    def test_unknown_task_creates_temporary_employee(self):
+        with tempfile.TemporaryDirectory() as directory:
+            initialize_workspace(directory)
+            result = CrewOrchestrator(directory).dispatch("处理一个全新领域的特殊任务")
+
+            self.assertEqual(result["dispatch_mode"], "temporary")
+            self.assertTrue(result["executor_id"].startswith("TEMP-"))
+            registry = json.loads(Path(directory, ".makecrew", "employee-registry.json").read_text(encoding="utf-8"))
+            self.assertEqual(registry[result["executor_id"]]["kind"], "temporary")
+
+    def test_temporary_employee_can_be_promoted_without_touching_core(self):
+        with tempfile.TemporaryDirectory() as directory:
+            initialize_workspace(directory)
+            orchestrator = CrewOrchestrator(directory)
+            result = orchestrator.dispatch("处理一个全新领域的特殊任务")
+
+            promoted = orchestrator.promote(result["executor_id"])
+            registry = json.loads(Path(directory, ".makecrew", "employee-registry.json").read_text(encoding="utf-8"))
+            self.assertEqual(promoted["kind"], "custom")
+            self.assertEqual(registry[result["executor_id"]]["kind"], "custom")
+            self.assertEqual(registry["CEO-001"]["kind"], "core")
 
 
 if __name__ == "__main__":

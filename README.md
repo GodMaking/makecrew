@@ -123,6 +123,7 @@ makecrew audit --tools filesystem,shell,browser,web_search
 ```bash
 # 在仓库目录执行
 python -m ai_company_os.cli "开发网站并准备上线，同时研究用户并写宣传文案" --project demo-site
+python -m ai_company_os.bootstrap_cli dispatch "修复登录页面的表单校验" --path ./my-ai-workspace --project demo-site
 python -m ai_company_os.web
 ```
 
@@ -136,10 +137,11 @@ python -m ai_company_os.web
 - `tests/`：路由行为测试
 - `ai_company_os.task_state`：可恢复任务台账和用量记录（传入 JSON 路径即可跨重启恢复）
 - `ai_company_os.learning`：验收反馈、改进提案和回放评分
+- `ai_company_os.orchestrator.CrewOrchestrator`：读取员工注册表，优先派给现有员工；缺少岗位时创建临时员工，并返回独立验收任务
 
 ### 当前能力边界
 
-MVP 负责把自然语言任务转换成可检查的协作计划：路由、岗位、并行子任务、验收门禁和预算。它不绑定模型、不上传任务文本，也不会假装已经替你调用外部员工。要执行真实工作，可把返回结果交给你使用的模型/Agent 平台，或按 `docs/platform-adapters.md` 接入自己的工具层。
+MVP 负责把自然语言任务转换成可检查的协作计划，并通过 `CrewOrchestrator` 把任务交给宿主平台提供的员工执行器。它不绑定模型、不上传任务文本；没有配置执行器时会明确返回 `queued`，不会把计划冒充成交付。按 `docs/platform-adapters.md` 接入自己的工具层即可连接真实员工对话。
 
 后续版本可以在这个稳定核心上增加模型适配器、员工状态同步和真实的并行执行器。员工数量、岗位名称和平台工具由使用者按实际工作扩展。
 

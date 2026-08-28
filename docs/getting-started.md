@@ -28,6 +28,28 @@ MVP 使用本地规则生成计划，不上传任务内容。接入真实模型�
 3. 按需要为开发、研究、文案、设计等岗位建对话，粘贴 `roles/worker.md`，再补充岗位专属工具说明；不需要的岗位先不创建，同一岗位可按项目复制多个。
 4. 你把跨项目目标发给 CEO；明确的单项工作直接发给专业员工。
 
+## 让主管真正派单
+
+路由计划和实际执行分成两步。宿主平台（例如 Codex 或其他 Agent 运行时）
+提供一个 dispatcher 后，`CrewOrchestrator` 会读取 `.makecrew/employee-registry.json`：
+
+```python
+from ai_company_os import CrewOrchestrator
+
+def send_to_employee(employee_id, payload):
+    # 连接宿主平台的员工对话/API，并返回 status、summary、evidence
+    return {"status": "completed", "summary": "员工交付结果"}
+
+result = CrewOrchestrator("./my-ai-workspace", dispatcher=send_to_employee).dispatch(
+    "开发网站并准备上线", project="demo-site"
+)
+```
+
+规则是：已有匹配员工优先；没有匹配岗位时生成 `TEMP-XXXXXXXX` 临时员工；
+同类任务稳定重复后调用 `promote(employee_id)` 升级为长期自定义员工，
+一次性任务则调用 `archive(employee_id)` 归档。CEO 只做决策和派单，
+不会因为缺少专业岗位而默默代做。
+
 ## 方式 B：一个对话模拟完整流程
 
 当平台不方便创建多个对话时，把 `roles/ceo.md`、`roles/project-manager.md` 和 `roles/worker.md` 作为三个角色段落放进同一系统提示词，并要求模型在每个任务开头输出当前路由。小任务仍走直达员工模式。
