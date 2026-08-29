@@ -355,6 +355,58 @@ class IntakePlannerTests(unittest.TestCase):
         self.assertLessEqual(len(result["questions"]), 3)
         self.assertTrue(result["single_conversation"])
         self.assertFalse(result["execute"])
+        self.assertIsNone(result["clarification"]["max_total_questions"])
+        self.assertTrue(result["clarification"]["has_more"])
+
+    def test_clarification_continues_across_rounds_without_repeating_questions(self):
+        first = plan_request("帮我做个网站")
+        first_ids = first["clarification"]["question_ids"]
+
+        second = plan_request(
+            "帮我做个网站",
+            clarification_round=2,
+            answered_question_ids=first_ids,
+        )
+
+        self.assertEqual(second["clarification"]["round"], 2)
+        self.assertTrue(second["clarification"]["question_ids"])
+        self.assertTrue(set(first_ids).isdisjoint(second["clarification"]["question_ids"]))
+
+    def test_clarification_ends_after_all_material_gaps_are_answered(self):
+        first = plan_request("帮我做个网站")
+
+        result = plan_request(
+            "帮我做个网站",
+            clarification_round=3,
+            answered_question_ids=first["clarification"]["all_question_ids"],
+        )
+
+        self.assertTrue(result["clarification"]["ready"])
+        self.assertEqual(result["questions"], [])
+        self.assertEqual(result["status"], "ready_to_execute")
+
+    def test_user_can_delegate_unspecified_details_to_ai_defaults(self):
+        result = plan_request("做网站，你决定")
+
+        self.assertEqual(result["mode"], "direct")
+        self.assertEqual(result["clarification"]["stop_reason"], "delegated_defaults")
+        self.assertTrue(result["execute"])
+
+    def test_host_ai_can_add_domain_specific_material_gaps(self):
+        gaps = [
+            {"question_id": f"domain-{index}", "prompt": f"领域问题 {index}", "reason": "影响专业方案"}
+            for index in range(1, 6)
+        ]
+
+        result = plan_request(
+            "整理本地知识库索引",
+            material_gaps=gaps,
+        )
+
+        self.assertEqual(result["mode"], "clarify")
+        self.assertEqual(len(result["questions"]), 3)
+        self.assertTrue(result["clarification"]["has_more"])
+        self.assertTrue(set(gap["question_id"] for gap in gaps).issubset(result["clarification"]["all_question_ids"]))
 
     def test_explicit_plan_request_waits_for_confirmation(self):
         result = plan_request(

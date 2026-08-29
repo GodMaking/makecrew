@@ -7,14 +7,14 @@ the existing CEO/orchestrator flow.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Iterable
 
 from .router import PUBLIC_ACTIONS, route_task
 from .discovery import MethodSearcher, discover_methods
 from .workflow import build_workflow
 
 
-MAX_QUESTIONS = 3
+MAX_QUESTIONS_PER_ROUND = 3
 
 PLAN_FIRST_HINTS = (
     "先给方案", "先出方案", "先别执行", "不要执行", "确认后执行",
@@ -28,20 +28,90 @@ LEARNING_HINTS = (
     "差评", "不合格", "返工", "失败", "重复问题", "复盘", "训练员工",
     "效果差", "没做好", "又错", "垃圾",
 )
+DEFAULT_DELEGATION_HINTS = (
+    "你决定", "你来定", "你看着办", "自行决定", "按默认", "按最佳实践",
+)
 
 
-def _question_for(task: str, plan: dict[str, Any]) -> list[str]:
-    questions: list[str] = []
-    public_question = any(word in task for word in PUBLIC_ACTIONS)
-    if public_question:
-        questions.append("生产发布确认")
-    if plan["domains"] == ["待澄清"]:
-        questions.append("你要的具体结果是什么，交付给谁或用在哪里？")
-    if any(word in task for word in ("网站", "应用", "app", "产品")) and not any(word in task for word in ("已有", "项目", "目录", "技术栈")):
-        questions.append("这是从零开始，还是基于已有项目？已有项目的目录或技术栈是什么？")
-    if not any(word in task for word in ("目标", "用户", "给", "用于", "演示", "上线")):
-        questions.append("完成标准是什么？需要达到什么效果或通过哪些检查？")
-    return questions[:MAX_QUESTIONS]
+def _gap(question_id: str, prompt: str, reason: str) -> dict[str, str]:
+    return {"question_id": question_id, "prompt": prompt, "reason": reason}
+
+
+def _clarification_gaps(task: str, plan: dict[str, Any]) -> list[dict[str, str]]:
+    """Return material decision gaps in priority order."""
+    normalized = task.lower()
+    domains = plan["domains"]
+    gaps: list[dict[str, str]] = []
+    if domains == ["待澄清"]:
+        gaps.append(_gap(
+            "outcome",
+            "你最终希望得到什么具体结果？它要解决什么问题？",
+            "目标产物和问题尚未明确",
+        ))
+        gaps.append(_gap(
+            "starting_context",
+            "这是从零开始，还是基于已有内容、文件或项目？请给出相关位置或现状。",
+            "起点会改变执行方法",
+        ))
+
+    product_work = "工程" in domains and any(word in normalized for word in ("网站", "应用", "app", "产品", "页面"))
+    if product_work and not any(word in normalized for word in ("已有", "现有", "从零", "新建", "目录", "代码库", "技术栈", "基于")):
+        gaps.append(_gap(
+            "project_basis",
+            "这是从零开始，还是基于已有项目？已有项目的目录和技术栈是什么？",
+            "项目基础决定实现路径",
+        ))
+
+    if not any(word in normalized for word in ("用户", "受众", "客户", "给", "用于", "面向", "内部", "自己")):
+        gaps.append(_gap(
+            "audience_and_use",
+            "谁会使用这个结果，主要在什么场景下使用？",
+            "使用者和场景会影响内容与实现取舍",
+        ))
+    if not any(word in normalized for word in ("验收", "完成标准", "达到", "通过", "效果", "演示", "上线")):
+        gaps.append(_gap(
+            "success_criteria",
+            "你怎样判断它已经做好？最重要的验收标准是什么？",
+            "缺少可验证的完成定义",
+        ))
+    if not any(word in normalized for word in ("限制", "约束", "必须", "预算", "兼容", "隐私", "技术栈", "格式", "尺寸")):
+        gaps.append(_gap(
+            "constraints",
+            "有哪些必须遵守的技术、预算、隐私、格式或兼容性要求？没有可写“由你决定”。",
+            "关键约束可能改变方案",
+        ))
+    if not any(word in normalized for word in ("截止", "今天", "明天", "本周", "下周", "日期", "时间", "尽快")):
+        gaps.append(_gap(
+            "deadline",
+            "有明确截止时间或优先级吗？",
+            "时间会影响范围和执行顺序",
+        ))
+    if product_work and not any(word in normalized for word in ("方案", "原型", "可运行", "完整版本", "最小版本", "mvp", "上线")):
+        gaps.append(_gap(
+            "delivery_depth",
+            "这次先交方案、原型、最小可用版本，还是完整可运行版本？",
+            "交付深度决定工作量和验收范围",
+        ))
+    return gaps
+
+
+def _merge_material_gaps(
+    builtin: Iterable[dict[str, str]],
+    supplied: Iterable[dict[str, Any]],
+) -> list[dict[str, str]]:
+    """Merge host-model gaps by stable ID while preserving priority order."""
+    merged: dict[str, dict[str, str]] = {}
+    for item in [*builtin, *supplied]:
+        question_id = str(item.get("question_id", "")).strip()
+        prompt = str(item.get("prompt", "")).strip()
+        if not question_id or not prompt:
+            continue
+        merged[question_id] = {
+            "question_id": question_id,
+            "prompt": prompt,
+            "reason": str(item.get("reason", "影响任务决策")).strip(),
+        }
+    return list(merged.values())
 
 
 def _skills_for(domains: list[str], task: str) -> list[str]:
@@ -105,12 +175,25 @@ def plan_request(
     method_searcher: MethodSearcher | None = None,
     learning_signal: bool = False,
     capability_gap: bool = False,
+    clarification_round: int = 1,
+    answered_question_ids: Iterable[str] = (),
+    material_gaps: Iterable[dict[str, Any]] = (),
 ) -> dict[str, Any]:
     """Choose the shortest reliable path for one task."""
     clean = task.strip()
     plan = route_task(clean)
     public_action = any(word in clean for word in PUBLIC_ACTIONS)
-    unclear = plan["needs_clarification"] or (len(clean) < 8 and not public_action)
+    if clarification_round < 1:
+        raise ValueError("澄清轮次必须大于 0")
+    answered_ids = {str(item).strip() for item in answered_question_ids if str(item).strip()}
+    supplied_gaps = list(material_gaps)
+    delegated_defaults = any(hint in clean for hint in DEFAULT_DELEGATION_HINTS)
+    base_unclear = plan["needs_clarification"] or (len(clean) < 8 and not public_action) or bool(supplied_gaps)
+    builtin_gaps = _clarification_gaps(clean, plan) if base_unclear or answered_ids or clarification_round > 1 else []
+    all_gaps = _merge_material_gaps(builtin_gaps, supplied_gaps)
+    pending_gaps = [gap for gap in all_gaps if gap["question_id"] not in answered_ids]
+    unclear = base_unclear and bool(pending_gaps) and not delegated_defaults
+    round_gaps = pending_gaps[:MAX_QUESTIONS_PER_ROUND] if unclear else []
     feedback_signal = any(hint in clean for hint in LEARNING_HINTS)
     learning_enabled = learning_signal or feedback_signal
     mode, requires_confirmation, discovery_needed = _request_mode(
@@ -119,7 +202,7 @@ def plan_request(
         unclear=unclear,
         capability_gap=capability_gap,
     )
-    questions = _question_for(clean, plan) if unclear else []
+    questions = [gap["prompt"] for gap in round_gaps]
     if mode == "guarded" and not confirmed:
         questions = ["生产发布确认"] if public_action else []
 
@@ -171,6 +254,25 @@ def plan_request(
         "tools": sorted({tool for item in plan["assignments"] for tool in item["tools"]}),
         "workflow": _workflow_for(mode, learning_signal=learning_enabled),
         "questions": questions,
+        "clarification": {
+            "round": clarification_round,
+            "ready": not unclear,
+            "questions_per_round": MAX_QUESTIONS_PER_ROUND,
+            "max_total_questions": None,
+            "question_ids": [gap["question_id"] for gap in round_gaps],
+            "all_question_ids": [gap["question_id"] for gap in all_gaps],
+            "answered_question_ids": sorted(answered_ids),
+            "remaining_question_ids": [gap["question_id"] for gap in pending_gaps],
+            "has_more": len(pending_gaps) > len(round_gaps),
+            "stop_reason": (
+                "delegated_defaults" if delegated_defaults
+                else "all_material_gaps_resolved" if base_unclear and not pending_gaps
+                else "decision_ready" if not base_unclear
+                else "awaiting_answers"
+            ),
+            "policy": "iterate_until_decision_ready",
+            "gap_source": "builtin_and_host" if supplied_gaps and builtin_gaps else "host" if supplied_gaps else "builtin",
+        },
         "question_details": {
             "生产发布确认": "请确认目标环境、域名/账号、发布版本、发布时间和回滚方案。"
         } if public_action else {},

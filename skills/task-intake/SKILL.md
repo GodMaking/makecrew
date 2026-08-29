@@ -15,13 +15,18 @@ separate employee conversation for an ordinary single task.
 
 1. Classify the request before model-heavy work:
    - clear, routine, reversible: execute now, then verify and deliver;
-   - materially ambiguous: ask only the blocking questions, up to three;
+   - materially ambiguous: ask one to three blocking questions per round and
+     continue until the task is decision-ready;
    - explicit research/comparison request or capability gap: discover methods;
    - explicit plan-first request or consequential action: present a brief and wait;
    - one multi-domain task: form an implicit expert panel in this conversation;
    - several submitted tasks: use CEO batch mode.
 2. When questions are needed, prefer deliverable, existing project/path, target
-   user, constraints, success criteria, or deadline. Zero questions is normal.
+   user, constraints, success criteria, or deadline. Total questions are 0-N,
+   with one to three per round. Stop when material gaps are resolved or the user
+   delegates remaining details to AI defaults.
+   Give each gap a stable ID, prompt, and reason. Merge domain-specific gaps
+   from the current model with the built-in gaps; skip IDs already answered.
 3. Discover methods, workflows, and Skills only when the request asks for fresh
    research/comparison or the current capability set has a real gap. Prefer
    primary sources and label local knowledge versus fresh results.

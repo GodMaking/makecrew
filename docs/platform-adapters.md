@@ -22,6 +22,11 @@
 
 将任务卡作为结构化输入，将路由结果作为状态机：`intake -> route -> execute -> review -> deliver -> log`。每个 Worker 接收最小上下文包，交接使用 YAML 或 JSON 差量对象。
 
+单任务澄清时，宿主模型先判断仍有哪些会改变结果的缺口，并以
+`material_gaps=[{"question_id", "prompt", "reason"}]` 传给 `plan_request()`。
+每轮展示 1-3 项；用户回答后把已解决 ID 写入 `answered_question_ids`，直到
+`clarification.ready` 为 `true`，或用户授权使用默认值。
+
 批量并发时实现线程适配器并传给 `BatchScheduler`：
 
 ```python

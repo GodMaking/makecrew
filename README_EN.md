@@ -64,13 +64,17 @@ Every new request is classified before model-heavy work begins:
 
 ```text
 clear routine task        -> execute -> verify -> deliver
-material ambiguity        -> ask 0-3 blocking questions -> route again
+material ambiguity        -> ask 1-3 blocking questions per round -> continue as needed
 explicit method research  -> discover methods/skills -> execute -> verify
 plan-first request         -> plan -> confirm -> execute -> verify
 public/irreversible action -> impact and rollback -> confirm -> execute
 one multi-domain task      -> in-conversation expert panel -> shared QA
 multiple submitted tasks  -> CEO batch scheduling
 ```
+
+The total is `0-N`: a clear task asks zero questions; an unclear task asks only
+one to three questions per round and continues until the material decision gaps
+are resolved. The user may also delegate remaining details to AI defaults.
 
 Discovery can use the local curated catalog or a host-provided search adapter
 for fresh official documentation and open-source methods. Results are
