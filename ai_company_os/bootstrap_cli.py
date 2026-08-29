@@ -42,6 +42,11 @@ def main(argv: list[str] | None = None) -> int:
     intake = subparsers.add_parser("intake", help="clarify and plan one task")
     intake.add_argument("task", nargs="+", help="task description")
     intake.add_argument("--confirmed", action="store_true", help="confirm the displayed plan")
+    intake.add_argument(
+        "--installed-skills",
+        default=None,
+        help="comma-separated skill IDs reported by the host; omitted uses MakeCrew bundled skills",
+    )
 
     batch = subparsers.add_parser("batch-plan", help="plan multiple tasks for CEO fan-out")
     batch.add_argument("tasks", nargs="+", help="independent task descriptions")
@@ -77,7 +82,14 @@ def main(argv: list[str] | None = None) -> int:
             "memory_scope": args.memory_scope,
         })
     elif args.command == "intake":
-        result = plan_request(" ".join(args.task), confirmed=args.confirmed)
+        installed_skills = None if args.installed_skills is None else [
+            item.strip() for item in args.installed_skills.split(",") if item.strip()
+        ]
+        result = plan_request(
+            " ".join(args.task),
+            confirmed=args.confirmed,
+            installed_skill_ids=installed_skills,
+        )
     elif args.command == "batch-plan":
         result = plan_batch(args.tasks)
     elif args.command == "batch-dispatch":

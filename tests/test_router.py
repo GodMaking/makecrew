@@ -307,11 +307,89 @@ class IntakePlannerTests(unittest.TestCase):
         self.assertEqual(result["status"], "ready_to_execute")
         self.assertTrue(result["execute"])
         self.assertFalse(result["requires_confirmation"])
-        self.assertEqual(result["discovery"]["status"], "skipped_not_needed")
-        self.assertEqual(result["method_recommendations"], [])
+        self.assertEqual(result["discovery"]["status"], "local_match")
+        self.assertTrue(result["method_recommendations"])
+        self.assertTrue(result["skill_resolution"]["local_checked"])
+        self.assertTrue(result["skill_resolution"]["matched_skill_ids"])
+        self.assertFalse(result["skill_resolution"]["requires_user_decision"])
         self.assertEqual(result["workflow"], ["执行", "验收", "交付"])
         self.assertEqual(result["learning_loop"]["stage"], "on_signal")
         self.assertFalse(result["learning_loop"]["enabled_for_this_task"])
+
+    def test_installed_skills_are_matched_before_external_search(self):
+        calls = []
+
+        def skill_searcher(task, missing_skill_ids):
+            calls.append((task, missing_skill_ids))
+            return []
+
+        result = plan_request(
+            "修复登录页表单校验并补测试，项目目录为 demo",
+            installed_skill_ids=[
+                "test-driven-development",
+                "debugging-and-error-recovery",
+                "frontend-ui-engineering",
+                "api-and-interface-design",
+            ],
+            skill_searcher=skill_searcher,
+        )
+
+        self.assertEqual(result["skill_resolution"]["status"], "local_match")
+        self.assertEqual(result["skill_resolution"]["missing_skill_ids"], [])
+        self.assertEqual(calls, [])
+        self.assertTrue(result["execute"])
+
+    def test_missing_skills_are_searched_and_wait_for_user_choice(self):
+        calls = []
+
+        def skill_searcher(task, missing_skill_ids):
+            calls.append((task, missing_skill_ids))
+            return [{
+                "skill_id": missing_skill_ids[0],
+                "name": "候选工程 Skill",
+                "description": "补齐当前任务所需工程能力",
+                "source": "https://github.com/OWNER/REPO",
+            }]
+
+        result = plan_request(
+            "修复登录页表单校验并补测试，项目目录为 demo",
+            installed_skill_ids=[],
+            skill_searcher=skill_searcher,
+        )
+
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(result["status"], "ready_for_skill_choice")
+        self.assertFalse(result["execute"])
+        self.assertEqual(result["skill_resolution"]["status"], "candidates_found")
+        self.assertTrue(result["skill_resolution"]["requires_user_decision"])
+        self.assertTrue(result["skill_resolution"]["candidates"])
+        self.assertIn("安装", result["skill_resolution"]["decision_prompt"])
+
+    def test_missing_skills_request_search_adapter_when_host_has_none(self):
+        result = plan_request(
+            "修复登录页表单校验并补测试，项目目录为 demo",
+            installed_skill_ids=[],
+        )
+
+        self.assertEqual(result["status"], "skill_search_required")
+        self.assertFalse(result["execute"])
+        self.assertEqual(result["skill_resolution"]["status"], "search_adapter_required")
+
+    def test_skill_search_waits_until_the_requirement_is_clear(self):
+        calls = []
+
+        def skill_searcher(task, missing_skill_ids):
+            calls.append((task, missing_skill_ids))
+            return []
+
+        result = plan_request(
+            "帮我处理一下",
+            installed_skill_ids=[],
+            skill_searcher=skill_searcher,
+        )
+
+        self.assertEqual(result["skill_resolution"]["status"], "deferred_until_clear")
+        self.assertEqual(calls, [])
 
     def test_method_searcher_is_optional_and_runs_only_after_clarity(self):
         calls = []
@@ -330,6 +408,22 @@ class IntakePlannerTests(unittest.TestCase):
         self.assertEqual(clear["method_recommendations"][0]["name"], "本地搜索方案")
         self.assertEqual(clear["mode"], "discovery")
         self.assertTrue(clear["execute"])
+
+    def test_local_method_match_does_not_call_external_search_for_routine_work(self):
+        calls = []
+
+        def searcher(task, domains):
+            calls.append((task, domains))
+            return [{"name": "外部方法"}]
+
+        result = plan_request(
+            "修复登录页表单校验并补测试，项目目录为 demo",
+            method_searcher=searcher,
+        )
+
+        self.assertEqual(result["discovery"]["status"], "local_match")
+        self.assertFalse(result["discovery"]["external_triggered"])
+        self.assertEqual(calls, [])
 
     def test_reported_capability_gap_triggers_discovery(self):
         calls = []

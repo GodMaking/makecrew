@@ -15,7 +15,7 @@ needs, while keeping the work verifiable, resumable, and improvable.
 |---|---|---|
 | Adaptive requirement clarification | Clear requests ask zero questions; ambiguous requests ask 1-3 material questions per round, with 0-N total | Stable question IDs, cross-round deduplication, host-supplied domain gaps, delegated AI defaults |
 | Shortest reliable path for one task | Routine, clear, reversible work reaches execution without management overhead | `task-intake` adaptive routing and a per-task workflow graph |
-| Conditional method and Skill discovery | Fresh methods are searched only when requested or when a real capability gap exists | Local curated catalog, host search adapter, traceable candidates |
+| Automatic method and Skill matching | Every clear task checks installed Skills and local methods first; unresolved gaps expand discovery | Host inventory, local catalog, search adapters, traceable candidates, user-choice gate |
 | Dynamic expert assembly | One capability uses one specialist; multi-domain work forms an in-conversation expert panel | Domain routing, parallel nodes, shared verification contract |
 | Real multi-task coordination | Explicit task batches gain decomposition, dependencies, concurrency limits, and one summary | `BatchScheduler`, dependency graph, adjustable concurrency |
 | Durable project continuity | Follow-up work reuses the same project employee thread and separates stable memory from current state | Project context packs and `(employee_id, project)` thread reuse |
@@ -74,9 +74,10 @@ host dispatcher to send the payload to real employee conversations.
 
 For a single task, `task-intake` first selects the shortest reliable path.
 Clear, low-risk, reversible work executes immediately and is then verified.
-Questions, external method discovery, and confirmation are conditional steps,
-not a mandatory pipeline. Most single tasks do not need multiple agents or a
-CEO. `plan_request()` keeps this flow local to the current conversation.
+Questions, external search, and confirmation are conditional steps, not a
+mandatory pipeline. Local Skill and method matching happens for every clear
+task. Most single tasks do not need multiple agents or a CEO. `plan_request()`
+keeps this flow local to the current conversation.
 Use `plan_batch()` only for an explicit multi-task CEO fan-out.
 
 ### When to dispatch manually vs. use the CEO
@@ -100,9 +101,10 @@ Token cost, parallel speed, dependency control, and rework risk explicit.
 Every new request is classified before model-heavy work begins:
 
 ```text
-clear routine task        -> execute -> verify -> deliver
+clear routine task        -> match local skills/methods -> execute -> verify -> deliver
 material ambiguity        -> ask 1-3 blocking questions per round -> continue as needed
-explicit method research  -> discover methods/skills -> execute -> verify
+missing local Skill       -> search candidates -> user chooses install/use -> execute
+fresh method requirement  -> expand method search -> compare -> execute -> verify
 plan-first request         -> plan -> confirm -> execute -> verify
 public/irreversible action -> impact and rollback -> confirm -> execute
 one multi-domain task      -> in-conversation expert panel -> shared QA
@@ -113,11 +115,12 @@ The total is `0-N`: a clear task asks zero questions; an unclear task asks only
 one to three questions per round and continues until the material decision gaps
 are resolved. The user may also delegate remaining details to AI defaults.
 
-Discovery can use the local curated catalog or a host-provided search adapter
-for fresh official documentation and open-source methods. Results are
-recommendations only: they do not silently install skills, expand scope, or
-trigger public actions. This keeps one-task work efficient while retaining CEO
-fan-out for explicit multi-task requests.
+For every clear task, the host supplies its installed Skill IDs. MakeCrew first
+matches them to task requirements and uses local matches directly. Missing Skill
+IDs are sent to a host-provided search adapter; candidates include purpose and
+source, then wait for the user to choose whether to install, use, or continue
+with current capabilities. Methods follow the same local-first rule, with
+broader search for fresh comparisons, local misses, or capability gaps.
 
 Each task produces a serializable workflow graph containing only the nodes it
 needs. A routine task normally has execute, verify, and deliver nodes. Intake,

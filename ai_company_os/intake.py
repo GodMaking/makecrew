@@ -10,7 +10,8 @@ from __future__ import annotations
 from typing import Any, Iterable
 
 from .router import PUBLIC_ACTIONS, route_task
-from .discovery import MethodSearcher, discover_methods
+from .capabilities import BUNDLED_SKILLS
+from .discovery import MethodSearcher, SkillSearcher, discover_methods, resolve_skills
 from .workflow import build_workflow
 
 
@@ -116,16 +117,26 @@ def _merge_material_gaps(
 
 def _skills_for(domains: list[str], task: str) -> list[str]:
     mapping = {
-        "工程": ["frontend-ui-engineering", "api-and-interface-design", "test-driven-development"],
-        "研究": ["web_search", "来源核验"],
-        "内容": ["文案结构", "平台适配"],
-        "设计": ["frontend-ui-engineering", "imagegen"],
-        "知识库": ["知识库检索", "引用整理"],
-        "技能": ["skill-creator", "触发验证"],
+        "工程": [
+            "test-driven-development", "debugging-and-error-recovery",
+            "frontend-ui-engineering", "api-and-interface-design",
+        ],
+        "研究": ["source-driven-development", "verification-before-completion"],
+        "内容": ["interview-me", "source-driven-development", "verification-before-completion"],
+        "设计": ["frontend-ui-engineering", "verification-before-completion"],
+        "知识库": ["source-driven-development", "context-engineering", "verification-before-completion"],
+        "技能": ["interview-me", "context-engineering", "verification-before-completion"],
     }
     skills = [item for domain in domains for item in mapping.get(domain, [])]
-    if "浏览器" in task or "网页" in task:
-        skills.append("browser")
+    normalized = task.lower()
+    if "浏览器" in normalized:
+        skills.append("browser-control")
+    if any(word in normalized for word in ("上线", "部署", "发布到生产")):
+        skills.extend(["ci-cd-and-automation", "shipping-and-launch"])
+    if any(word in normalized for word in ("github", "git ", "提交代码", "推送代码")):
+        skills.append("git-workflow-and-versioning")
+    if "skill" in normalized and "技能" in domains:
+        skills.append("skill-creator")
     return list(dict.fromkeys(skills))
 
 
@@ -173,6 +184,8 @@ def plan_request(
     *,
     confirmed: bool = False,
     method_searcher: MethodSearcher | None = None,
+    skill_searcher: SkillSearcher | None = None,
+    installed_skill_ids: Iterable[str] | None = None,
     learning_signal: bool = False,
     capability_gap: bool = False,
     clarification_round: int = 1,
@@ -206,34 +219,53 @@ def plan_request(
     if mode == "guarded" and not confirmed:
         questions = ["生产发布确认"] if public_action else []
 
+    required_skills = _skills_for(plan["domains"], clean)
+    installed_inventory = list(BUNDLED_SKILLS if installed_skill_ids is None else installed_skill_ids)
     if unclear:
         discovery = discover_methods(clean, ["待澄清"])
-    elif discovery_needed:
-        discovery = discover_methods(clean, plan["domains"], searcher=method_searcher)
     else:
-        discovery = {
-            "status": "skipped_not_needed",
-            "query": clean,
-            "methods": [],
-            "search_error": "",
-        }
+        discovery = discover_methods(
+            clean,
+            plan["domains"],
+            searcher=method_searcher,
+            search_external=discovery_needed,
+        )
+    skill_resolution = resolve_skills(
+        clean,
+        required_skills,
+        installed_inventory,
+        searcher=skill_searcher,
+        defer=unclear,
+    )
+    skill_choice_needed = skill_resolution["requires_user_decision"]
+    skill_gap_unresolved = skill_resolution["status"] in {
+        "search_adapter_required", "search_failed", "no_candidates",
+    }
 
     if unclear:
         status = "needs_clarification"
+    elif skill_choice_needed:
+        status = "ready_for_skill_choice"
+    elif skill_gap_unresolved:
+        status = "skill_search_required"
     elif requires_confirmation and not confirmed:
         status = "ready_for_confirmation"
     else:
         status = "ready_to_execute"
 
     include_intake = mode in {"clarify", "plan_first", "guarded"}
+    external_discovery_used = discovery["external_searched"] or skill_resolution["external_searched"]
     workflow_graph = build_workflow(
         plan["assignments"],
         acceptance_gates=plan["acceptance_gates"],
         requires_confirmation=requires_confirmation,
         include_intake=include_intake,
-        include_discovery=discovery_needed,
+        include_discovery=external_discovery_used or skill_gap_unresolved,
         include_learning=learning_enabled,
     )
+    workflow_steps = _workflow_for(mode, learning_signal=learning_enabled)
+    if skill_choice_needed or skill_gap_unresolved:
+        workflow_steps.insert(0, "Skill 匹配与选择")
 
     return {
         "task": clean,
@@ -242,17 +274,25 @@ def plan_request(
         "single_conversation": True,
         "lead": "当前对话主管",
         "experts": plan["domains"] if plan["domains"] != ["待澄清"] else [],
-        "skills": _skills_for(plan["domains"], clean),
+        "skills": required_skills,
+        "skill_resolution": skill_resolution,
         "method_recommendations": discovery["methods"],
         "discovery": {
             "status": discovery["status"],
             "search_error": discovery["search_error"],
-            "triggered": discovery_needed,
-            "reason": "capability_gap" if capability_gap else "user_request" if discovery_needed else "not_needed",
-            "user_selects_before_execution": requires_confirmation,
+            "triggered": not unclear,
+            "external_triggered": discovery["external_searched"],
+            "local_match_count": discovery["local_match_count"],
+            "reason": (
+                "capability_gap" if capability_gap
+                else "user_request" if discovery_needed
+                else "no_local_match" if discovery["local_match_count"] == 0
+                else "task_local_match"
+            ),
+            "user_selects_before_execution": skill_choice_needed,
         },
         "tools": sorted({tool for item in plan["assignments"] for tool in item["tools"]}),
-        "workflow": _workflow_for(mode, learning_signal=learning_enabled),
+        "workflow": workflow_steps,
         "questions": questions,
         "clarification": {
             "round": clarification_round,
@@ -288,6 +328,7 @@ def plan_request(
             "storage": ".makecrew/learning.json (optional)",
         },
         "requires_confirmation": requires_confirmation,
+        "requires_skill_confirmation": skill_choice_needed,
         "execute": status == "ready_to_execute",
         "execution_route": "current_conversation_expert_panel" if mode == "team" else "current_conversation",
         "token_policy": "只保留当前任务必要上下文，不复制完整员工历史",

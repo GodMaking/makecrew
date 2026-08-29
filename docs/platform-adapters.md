@@ -27,6 +27,21 @@
 每轮展示 1-3 项；用户回答后把已解决 ID 写入 `answered_question_ids`，直到
 `clarification.ready` 为 `true`，或用户授权使用默认值。
 
+需求清晰后，宿主应把实际已安装 Skill ID 传入 `installed_skill_ids`。
+`plan_request()` 先做本地匹配；存在缺口时，再把缺失 ID 传给
+`skill_searcher(task, missing_skill_ids)`。搜索结果至少包含 `skill_id`、`name`、
+`description` 和 `source`。`candidates_found` 状态只展示候选，用户选择后由宿主安装，
+安装完成再刷新本地清单。
+
+```python
+result = plan_request(
+    task,
+    installed_skill_ids=host.list_installed_skill_ids(),
+    skill_searcher=lambda task, missing: host.search_skills(task, missing),
+    method_searcher=lambda task, domains: host.search_methods(task, domains),
+)
+```
+
 批量并发时实现线程适配器并传给 `BatchScheduler`：
 
 ```python

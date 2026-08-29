@@ -1,6 +1,6 @@
 ---
 name: task-intake
-description: Select the shortest reliable path for a task: execute clear routine work directly, ask only blocking questions, discover methods only when needed, and require confirmation only for plan-first or consequential actions.
+description: Select the shortest reliable path, match installed Skills and local methods for every clear task, search unresolved gaps, and ask the user before installing or using external candidates.
 ---
 
 # Task Intake and Execution
@@ -17,7 +17,8 @@ separate employee conversation for an ordinary single task.
    - clear, routine, reversible: execute now, then verify and deliver;
    - materially ambiguous: ask one to three blocking questions per round and
      continue until the task is decision-ready;
-   - explicit research/comparison request or capability gap: discover methods;
+   - every clear task: match required capabilities against installed Skills and local methods;
+   - missing local capability or fresh research/comparison need: expand discovery;
    - explicit plan-first request or consequential action: present a brief and wait;
    - one multi-domain task: form an implicit expert panel in this conversation;
    - several submitted tasks: use CEO batch mode.
@@ -27,9 +28,15 @@ separate employee conversation for an ordinary single task.
    delegates remaining details to AI defaults.
    Give each gap a stable ID, prompt, and reason. Merge domain-specific gaps
    from the current model with the built-in gaps; skip IDs already answered.
-3. Discover methods, workflows, and Skills only when the request asks for fresh
-   research/comparison or the current capability set has a real gap. Prefer
-   primary sources and label local knowledge versus fresh results.
+3. For every decision-ready task, inspect the host's installed Skill inventory
+   and match it to the task, tools, and acceptance checks. Use matching local
+   Skills directly. When required capability IDs are missing, search external
+   candidates and present each candidate's purpose, source, and trade-offs.
+   Ask the user whether to install/use a candidate or continue with current
+   capabilities. After installation, refresh the local inventory before work.
+   Match local methods on every clear task; expand external method search when
+   the user needs a fresh comparison, the local catalog has no match, or a
+   capability gap remains. Prefer primary sources and label local versus fresh.
 4. For plan-first or consequential work, present an execution brief:
    - selected skills and tools, with a reason for each;
    - candidate methods and Skills, with evidence and trade-offs;
@@ -49,10 +56,11 @@ separate employee conversation for an ordinary single task.
 8. Trigger learning only after negative feedback, failed verification, rework,
    repeated issues, or an explicit retrospective request.
 
-The host may provide a `method_searcher(task, domains)` adapter for fresh web or
-repository research. Calling it is conditional, even when it is available.
-Never let a search result silently change scope, install a package, or trigger a
-public action.
+The host should provide its installed Skill IDs and may provide both
+`skill_searcher(task, missing_skill_ids)` and `method_searcher(task, domains)`
+adapters. Local matching is automatic after clarification. External search is
+gap-driven or freshness-driven. Keep candidates pending until the user chooses
+and the host confirms installation or availability.
 
 ## Batch mode: explicit multi-task request
 

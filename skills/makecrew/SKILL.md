@@ -13,6 +13,11 @@ directly, while clarification, discovery, confirmation, an expert panel, and
 learning are added only when triggered. Keep MakeCrew's CEO/orchestrator path
 for explicit multi-task parallel work or cross-project decisions.
 
+For every clear task, inspect and match the host's installed Skills first. Use
+local matches directly. Search external candidates for missing capabilities,
+show their purpose and source, and wait for the user's install/use choice before
+the host changes its Skill inventory.
+
 ## Setup
 
 1. Read `README.md`, `docs/getting-started.md`, `docs/platform-adapters.md`, and `docs/skill-card.md`.

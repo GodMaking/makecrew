@@ -11,6 +11,7 @@ from typing import Any, Callable
 
 
 MethodSearcher = Callable[[str, list[str]], list[dict[str, Any]]]
+SkillSearcher = Callable[[str, list[str]], list[dict[str, Any]]]
 
 LOCAL_METHODS: dict[str, list[dict[str, Any]]] = {
     "工程": [{
@@ -68,23 +69,46 @@ def _normalize(item: dict[str, Any], *, source: str) -> dict[str, Any]:
     }
 
 
+def _normalize_skill(item: dict[str, Any]) -> dict[str, str]:
+    skill_id = str(item.get("skill_id") or item.get("id") or item.get("name") or "").strip()
+    return {
+        "skill_id": skill_id,
+        "name": str(item.get("name") or skill_id or "候选 Skill").strip(),
+        "description": str(item.get("description") or item.get("summary") or item.get("why") or "与当前任务相关").strip(),
+        "source": str(item.get("source") or item.get("url") or "宿主搜索结果").strip(),
+    }
+
+
 def discover_methods(
     task: str,
     domains: list[str],
     *,
     searcher: MethodSearcher | None = None,
+    search_external: bool | None = None,
 ) -> dict[str, Any]:
-    """Return local recommendations plus optional host-provided search results."""
+    """Match local methods first, then optionally expand to host search."""
     if domains == ["待澄清"]:
-        return {"status": "deferred_until_clear", "query": task, "methods": [], "search_error": ""}
+        return {
+            "status": "deferred_until_clear",
+            "query": task,
+            "methods": [],
+            "local_match_count": 0,
+            "external_searched": False,
+            "search_error": "",
+        }
 
     local_methods: list[dict[str, Any]] = []
     for domain in domains:
         local_methods.extend(_normalize(item, source="MakeCrew 内置流程") for item in LOCAL_METHODS.get(domain, []))
     methods: list[dict[str, Any]] = []
     search_error = ""
-    status = "ready"
-    if searcher is not None:
+    should_search_external = searcher is not None and (
+        search_external is not False or not local_methods
+    )
+    external_searched = False
+    status = "local_match" if local_methods else "no_local_match"
+    if should_search_external:
+        external_searched = True
         try:
             methods.extend(_normalize(item, source="宿主搜索结果") for item in (searcher(task, domains) or [])[:4])
             status = "searched"
@@ -99,4 +123,119 @@ def discover_methods(
         if key not in seen:
             seen.add(key)
             deduped.append(method)
-    return {"status": status, "query": task, "methods": deduped[:8], "search_error": search_error}
+    return {
+        "status": status,
+        "query": task,
+        "methods": deduped[:8],
+        "local_match_count": len(local_methods),
+        "external_searched": external_searched,
+        "search_error": search_error,
+    }
+
+
+def resolve_skills(
+    task: str,
+    required_skill_ids: list[str],
+    installed_skill_ids: list[str],
+    *,
+    searcher: SkillSearcher | None = None,
+    defer: bool = False,
+) -> dict[str, Any]:
+    """Match installed skills and search only for unresolved capability gaps."""
+    required = list(dict.fromkeys(skill_id.strip() for skill_id in required_skill_ids if skill_id.strip()))
+    installed = {skill_id.strip() for skill_id in installed_skill_ids if skill_id.strip()}
+    if defer:
+        return {
+            "status": "deferred_until_clear",
+            "local_checked": False,
+            "required_skill_ids": required,
+            "matched_skill_ids": [],
+            "missing_skill_ids": required,
+            "external_searched": False,
+            "candidates": [],
+            "search_error": "",
+            "requires_user_decision": False,
+            "decision_prompt": "",
+        }
+
+    matched = [skill_id for skill_id in required if skill_id in installed]
+    missing = [skill_id for skill_id in required if skill_id not in installed]
+    if not missing:
+        return {
+            "status": "local_match",
+            "local_checked": True,
+            "required_skill_ids": required,
+            "matched_skill_ids": matched,
+            "missing_skill_ids": [],
+            "external_searched": False,
+            "candidates": [],
+            "search_error": "",
+            "requires_user_decision": False,
+            "decision_prompt": "",
+        }
+
+    if searcher is None:
+        return {
+            "status": "search_adapter_required",
+            "local_checked": True,
+            "required_skill_ids": required,
+            "matched_skill_ids": matched,
+            "missing_skill_ids": missing,
+            "external_searched": False,
+            "candidates": [],
+            "search_error": "",
+            "requires_user_decision": False,
+            "decision_prompt": "请启用宿主 Skill 搜索能力，查找缺失能力的候选实现。",
+        }
+
+    try:
+        raw_candidates = searcher(task, missing) or []
+        candidates = [_normalize_skill(item) for item in raw_candidates[:8]]
+        candidates = [item for item in candidates if item["skill_id"]]
+        deduped: list[dict[str, str]] = []
+        seen: set[tuple[str, str]] = set()
+        for candidate in candidates:
+            key = (candidate["skill_id"], candidate["source"])
+            if key not in seen:
+                seen.add(key)
+                deduped.append(candidate)
+    except Exception as exc:
+        return {
+            "status": "search_failed",
+            "local_checked": True,
+            "required_skill_ids": required,
+            "matched_skill_ids": matched,
+            "missing_skill_ids": missing,
+            "external_searched": True,
+            "candidates": [],
+            "search_error": f"{type(exc).__name__}: {exc}",
+            "requires_user_decision": False,
+            "decision_prompt": "保留已匹配 Skill，修复搜索适配器后继续查找缺失能力。",
+        }
+
+    if not deduped:
+        return {
+            "status": "no_candidates",
+            "local_checked": True,
+            "required_skill_ids": required,
+            "matched_skill_ids": matched,
+            "missing_skill_ids": missing,
+            "external_searched": True,
+            "candidates": [],
+            "search_error": "",
+            "requires_user_decision": False,
+            "decision_prompt": "当前没有找到合适候选，可调整搜索来源或由现有能力执行。",
+        }
+
+    return {
+        "status": "candidates_found",
+        "local_checked": True,
+        "required_skill_ids": required,
+        "matched_skill_ids": matched,
+        "missing_skill_ids": missing,
+        "external_searched": True,
+        "candidates": deduped,
+        "search_error": "",
+        "requires_user_decision": True,
+        "decision_prompt": "本地缺少部分匹配 Skill。请选择是否安装并使用上述候选，或继续使用现有能力。",
+    }
