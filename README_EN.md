@@ -39,6 +39,22 @@ For the common single-task path, `plan_request()` keeps clarification,
 skill/tool selection, confirmation, and execution in the current conversation.
 Use `plan_batch()` only for an explicit multi-task CEO fan-out.
 
+### When to dispatch manually vs. use the CEO
+
+- **One clear task:** send it directly to the specialist or use `task-intake` in
+  the current conversation for the shortest, lowest-token path.
+- **Several tiny independent tasks:** manual dispatch can be cheaper because it
+  avoids an extra management round.
+- **Several complex tasks, dependencies, or one shared QA result:** use the CEO
+  batch path. Planning and summary add some tokens, while specialists still do
+  the execution; the overhead is often smaller than repeating context, waiting,
+  or rework.
+- **Follow-up work in one project:** reuse the same employee thread and project
+  context instead of opening new conversations for formality.
+
+MakeCrew does not claim CEO coordination is free. It makes the trade-off among
+Token cost, parallel speed, dependency control, and rework risk explicit.
+
 ## Core flow
 
 ```text
