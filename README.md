@@ -112,9 +112,12 @@ MakeCrew 提供的是一套可运行的底座，不是固定数量的“虚拟�
 ```bash
 makecrew init --path ./my-ai-workspace --project demo
 makecrew audit --tools filesystem,shell,browser,web_search
+makecrew capability-audit
 ```
 
 面向支持 Skill 的平台，可读取 [`skills/makecrew/SKILL.md`](skills/makecrew/SKILL.md) 作为标准入口。
+
+岗位与 Skill 的完整对应关系见 [`docs/capability-matrix.md`](docs/capability-matrix.md)。运行 `makecrew capability-audit` 可检查所有内置员工的 Skill 文件是否齐全；初始化已有工作区时只增量补写缺失的 `skill_ids`，不会覆盖既有员工配置。
 
 想快速体验完整闭环，可直接运行 [`examples/first-task/README.md`](examples/first-task/README.md)。
 
@@ -199,7 +202,7 @@ CLI 的 `batch-dispatch` 会输出本批次的 `dispatches` 和
 
 ## 目录
 
-- `roles/`：CEO、项目主管、专业员工的职责模板
+- `roles/`：CEO、项目主管、专业员工和独立验收员的职责模板
 - `templates/`：任务卡、上下文包、差量交接模板
 - `examples/`：网站开发、内容增长、知识库整理示例
 - `docs/`：架构、记忆模型和路由规则

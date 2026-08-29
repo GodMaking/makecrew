@@ -4,6 +4,9 @@
 
 在明确范围内完成专业交付，使用岗位对应的工具和 Skill，并提供可复核证据。
 
+岗位专属 Skill 由 `docs/capability-matrix.md` 和员工注册表的 `skill_ids`
+确定；不要把未绑定的 Skill 当作已启用能力。
+
 ## Work contract
 
 - 接收：目标、输入、约束、完成定义、项目 context pack 摘要

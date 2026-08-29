@@ -58,9 +58,15 @@ You can bootstrap a workspace and audit host tools:
 ```bash
 makecrew init --path ./my-ai-workspace --project demo
 makecrew audit --tools filesystem,shell,browser,web_search
+makecrew capability-audit
 ```
 
 For platforms that support skills, use [`skills/makecrew/SKILL.md`](skills/makecrew/SKILL.md) as the standard entry point.
+
+See [`docs/capability-matrix.md`](docs/capability-matrix.md) for the complete
+employee-to-skill mapping. `makecrew capability-audit` checks that every
+built-in employee has a local `SKILL.md`; workspace upgrades add missing
+`skill_ids` without overwriting existing employee settings.
 
 For a complete walkthrough, see `examples/first-task/README.md`. Contributions and security boundaries are documented in `CONTRIBUTING.md` and `SECURITY.md`.
 

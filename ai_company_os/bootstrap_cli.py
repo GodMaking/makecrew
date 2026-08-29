@@ -9,6 +9,7 @@ from .bootstrap import audit_tools, initialize_workspace, register_employee
 from .orchestrator import CrewOrchestrator
 from .intake import plan_batch, plan_request
 from .batch import BatchScheduler
+from .capabilities import audit_employee_capabilities
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -21,6 +22,8 @@ def main(argv: list[str] | None = None) -> int:
 
     audit = subparsers.add_parser("audit", help="check host tools against employee profiles")
     audit.add_argument("--tools", default="", help="comma-separated available tool names")
+
+    capability_audit = subparsers.add_parser("capability-audit", help="audit built-in employee skill bindings")
 
     add = subparsers.add_parser("add-employee", help="add a user-defined employee")
     add.add_argument("--path", default=".", help="workspace directory")
@@ -62,6 +65,8 @@ def main(argv: list[str] | None = None) -> int:
         result = initialize_workspace(args.path, project=args.project)
     elif args.command == "audit":
         result = audit_tools([item for item in args.tools.split(",") if item.strip()])
+    elif args.command == "capability-audit":
+        result = audit_employee_capabilities()
     elif args.command == "add-employee":
         result = register_employee(args.path, {
             "employee_id": args.employee_id,

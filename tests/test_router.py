@@ -16,9 +16,18 @@ from http.server import ThreadingHTTPServer
 from ai_company_os.orchestrator import CrewOrchestrator
 from ai_company_os.intake import plan_batch, plan_request
 from ai_company_os.batch import BatchScheduler
+from ai_company_os.capabilities import EMPLOYEE_SKILL_MATRIX, audit_employee_capabilities
 
 
 class RouteTaskTests(unittest.TestCase):
+    def test_every_builtin_employee_has_a_skill_matrix_and_role_contract(self):
+        report = audit_employee_capabilities()
+
+        self.assertEqual(report["missing_profiles"], [])
+        self.assertEqual(report["missing_skill_ids"], [])
+        self.assertEqual(set(report["employees"]), set(EMPLOYEE_SKILL_MATRIX))
+        self.assertIn("task-intake", report["shared_skills"])
+
     def test_assignment_includes_capability_contract(self):
         result = route_task("开发网站并准备上线")
 
@@ -56,6 +65,9 @@ class RouteTaskTests(unittest.TestCase):
 
     def test_skill_worker_contract_is_available(self):
         self.assertTrue(Path(__file__).parents[1].joinpath("roles", "skill-worker.md").exists())
+
+    def test_independent_qa_role_contract_is_available(self):
+        self.assertTrue(Path(__file__).parents[1].joinpath("roles", "qa.md").exists())
 
     def test_multi_role_project_routes_to_project_lead(self):
         result = route_task("开发网站并准备上线，同时研究用户并写宣传文案")
@@ -183,6 +195,8 @@ class BootstrapTests(unittest.TestCase):
             self.assertEqual(registry["QA-001"]["kind"], "core")
             self.assertEqual(registry["ENG-001"]["kind"], "specialist_template")
             self.assertEqual(registry["SKL-001"]["kind"], "specialist_template")
+            self.assertIn("task-intake", registry["CEO-001"]["skill_ids"])
+            self.assertIn("test-driven-development", registry["ENG-001"]["skill_ids"])
 
     def test_audit_tools_reports_missing_capabilities(self):
         report = audit_tools(["filesystem", "shell"])
@@ -222,6 +236,7 @@ class BootstrapTests(unittest.TestCase):
             self.assertIn("LEGACY-001", upgraded)
             self.assertEqual(upgraded["CEO-001"]["kind"], "core")
             self.assertEqual(upgraded["QA-001"]["kind"], "core")
+            self.assertIn("skill_ids", upgraded["CEO-001"])
 
 
 class OrchestrationTests(unittest.TestCase):

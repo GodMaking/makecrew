@@ -28,6 +28,8 @@ conversation. Use CEO fan-out only for explicit multi-task concurrency.
 8. Explicit multi-task batches with dependency-aware scheduling, concurrency and
    tool-call budgets, pause/resume/cancel controls, failure reasons, and project
    employee-thread reuse.
+9. Auditable employee-to-skill matrix with portable local adapters and traced
+   upstream references.
 
 ## Employee sizing
 
@@ -44,6 +46,10 @@ MakeCrew is a lightweight, model-agnostic coordination layer. It complements Cod
 ## Setup intent
 
 An AI assistant receiving this repository should read `docs/getting-started.md`, inspect `roles/`, `templates/`, and `docs/platform-adapters.md`, then configure the roles and tools supported by the user's platform. It should preserve existing project memory and run a small test task before enabling higher-cost execution.
+
+Run `makecrew capability-audit` after setup. It checks every built-in employee's
+`skill_ids` and local `SKILL.md` files; see `docs/capability-matrix.md` for the
+role mapping and the GitHub sources used for workflow comparison.
 
 ## Search terms
 

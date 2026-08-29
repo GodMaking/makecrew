@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from .router import CORE_EMPLOYEE_PROFILES, EMPLOYEE_PROFILES, EmployeeProfile
+from .capabilities import skill_ids_for_employee
 
 
 KNOWN_TOOLS = (
@@ -63,6 +64,7 @@ def initialize_workspace(base_dir: str | Path, *, project: str = "main") -> dict
             "memory_scope": profile.memory_scope,
             "status": profile.status,
             "kind": profile.kind,
+            "skill_ids": skill_ids_for_employee(profile.employee_id),
         }
         for profile in [*CORE_EMPLOYEE_PROFILES.values(), *EMPLOYEE_PROFILES.values()]
     }
@@ -81,6 +83,9 @@ def initialize_workspace(base_dir: str | Path, *, project: str = "main") -> dict
                 changed = True
             elif "kind" not in registry[employee_id]:
                 registry[employee_id]["kind"] = profile["kind"]
+                changed = True
+            if "skill_ids" not in registry[employee_id]:
+                registry[employee_id]["skill_ids"] = profile["skill_ids"]
                 changed = True
         if changed:
             registry_path.write_text(json.dumps(registry, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

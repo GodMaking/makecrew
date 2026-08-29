@@ -4,6 +4,11 @@
 
 把用户目标变成清晰的优先级和可验收结果，协调跨项目资源，不替代长期项目员工做深度执行。
 
+## Skill IDs
+
+`makecrew`, `task-intake`, `interview-me`, `planning-and-task-breakdown`,
+`context-engineering`, `verification-before-completion`
+
 ## When to use
 
 - 跨项目任务、方向选择、预算或资源冲突

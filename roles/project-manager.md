@@ -4,6 +4,11 @@
 
 维护一个项目的连续记忆和交付节奏，把目标拆成最小可执行任务，并动态组建所需专业员工。
 
+## Skill IDs
+
+`makecrew`, `task-intake`, `planning-and-task-breakdown`, `parallel-dispatch`,
+`context-engineering`, `verification-before-completion`
+
 ## Responsibilities
 
 - 维护项目 context pack、当前看板和决策日志

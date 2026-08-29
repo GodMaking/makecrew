@@ -14,6 +14,7 @@ from typing import Any, Callable
 
 from .bootstrap import initialize_workspace
 from .router import CORE_EMPLOYEE_PROFILES, EMPLOYEE_PROFILES, route_task
+from .capabilities import skill_ids_for_employee
 
 
 Dispatcher = Callable[[str, dict[str, Any]], dict[str, Any]]
@@ -97,6 +98,7 @@ class CrewOrchestrator:
                 "objective": "把 CEO 决策拆成可执行任务",
                 "output": "任务拆解、负责人和依赖",
                 "employee_id": employee_id,
+                "skill_ids": skill_ids_for_employee(employee_id),
                 "dispatch_mode": "existing",
             }
             assignments.append(assignment)

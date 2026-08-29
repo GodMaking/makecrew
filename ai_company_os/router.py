@@ -74,6 +74,7 @@ class Assignment:
     status: str = "active"
     memory_scope: str = "project"
     kind: str = "specialist_template"
+    skill_ids: tuple[str, ...] = ()
 
 
 def _domains_for(text: str) -> list[str]:
@@ -103,6 +104,8 @@ def _acceptance_gates(domains: list[str], text: str) -> list[str]:
 
 
 def _assignment(domain: str) -> Assignment:
+    from .capabilities import skill_ids_for_employee
+
     profile = EMPLOYEE_PROFILES[domain]
     outputs = {
         "工程": "可运行实现、测试结果和变更说明",
@@ -122,11 +125,14 @@ def _assignment(domain: str) -> Assignment:
         profile.status,
         profile.memory_scope,
         profile.kind,
+        tuple(skill_ids_for_employee(profile.employee_id)),
     )
 
 
 def route_task(task: str, project: str = "") -> dict:
     """Create a deterministic, reviewable collaboration plan from a task description."""
+    from .capabilities import skill_ids_for_employee
+
     task = task.strip()
     domains = _domains_for(task)
     is_strategy = any(keyword in task for keyword in CEO_KEYWORDS)
@@ -169,8 +175,13 @@ def route_task(task: str, project: str = "") -> dict:
         "verification_contract": {
             "employee_id": "QA-001",
             "role": "验收员",
+            "skill_ids": skill_ids_for_employee("QA-001"),
             "required_checks": ["交付物存在", "证据可复核", "验收门禁通过"],
             "independent": True,
+        },
+        "core_capabilities": {
+            employee_id: skill_ids_for_employee(employee_id)
+            for employee_id in ("CEO-001", "PM-001", "QA-001")
         },
         "specialist_templates": [
             {
@@ -181,6 +192,7 @@ def route_task(task: str, project: str = "") -> dict:
                 "tools": list(profile.tools),
                 "memory_scope": profile.memory_scope,
                 "kind": profile.kind,
+                "skill_ids": skill_ids_for_employee(profile.employee_id),
             }
             for profile in EMPLOYEE_PROFILES.values()
         ],
