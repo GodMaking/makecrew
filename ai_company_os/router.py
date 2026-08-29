@@ -132,6 +132,7 @@ def _assignment(domain: str) -> Assignment:
 def route_task(task: str, project: str = "") -> dict:
     """Create a deterministic, reviewable collaboration plan from a task description."""
     from .capabilities import skill_ids_for_employee
+    from .workflow import build_workflow
 
     task = task.strip()
     domains = _domains_for(task)
@@ -204,6 +205,11 @@ def route_task(task: str, project: str = "") -> dict:
             "handoff_format": "delta_only",
         },
         "acceptance_gates": _acceptance_gates(domains, task),
+        "workflow_graph": build_workflow(
+            [asdict(item) for item in assignments],
+            acceptance_gates=_acceptance_gates(domains, task),
+            requires_confirmation=requires_confirmation,
+        ),
         "budget": budget,
         "requires_user_confirmation": requires_confirmation,
         "needs_clarification": needs_clarification,

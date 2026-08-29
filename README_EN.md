@@ -72,6 +72,14 @@ recommendations only: they do not silently install skills, expand scope, or
 trigger public actions. This keeps one-task work efficient while retaining CEO
 fan-out for explicit multi-task requests.
 
+Each task also produces a serializable workflow graph with intake, discovery,
+confirmation, specialist execution, independent verification, delivery, and
+learning nodes. Independent specialists share a confirmation gate and can run
+in parallel; verification waits for every branch. The graph exposes durable
+checkpoints and human interrupts so a host runtime can resume work without
+replaying the full conversation. See `docs/inspiration-comparison.md` for the
+public-project comparison behind these choices.
+
 After verification, the learning loop records score, feedback, and root cause.
 Repeated failures produce a reviewable proposal; representative replay must beat
 the baseline before approval. Approval is versioned and reviewable, not a silent

@@ -17,6 +17,7 @@ from ai_company_os.orchestrator import CrewOrchestrator
 from ai_company_os.intake import plan_batch, plan_request
 from ai_company_os.batch import BatchScheduler
 from ai_company_os.capabilities import EMPLOYEE_SKILL_MATRIX, audit_employee_capabilities
+from ai_company_os.workflow import build_workflow, ready_nodes
 
 
 class RouteTaskTests(unittest.TestCase):
@@ -46,6 +47,7 @@ class RouteTaskTests(unittest.TestCase):
         self.assertIn("approval_required_for", result["execution_policy"])
         self.assertEqual(result["core_roles"], ["CEO", "项目主管", "验收员"])
         self.assertEqual(result["verification_contract"]["employee_id"], "QA-001")
+        self.assertIn("workflow_graph", result)
 
     def test_single_specialist_task_routes_directly(self):
         result = route_task("修复登录页面的表单校验")
@@ -101,6 +103,8 @@ class RouteTaskTests(unittest.TestCase):
         self.assertIn("ENG-001", page)
         self.assertIn("恢复策略", page)
         self.assertIn("推荐方法与 Skill", page)
+        self.assertIn("工作流图", page)
+        self.assertIn("人审中断点", page)
 
     def test_local_http_demo_serves_a_plan(self):
         server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
@@ -374,6 +378,36 @@ class IntakePlannerTests(unittest.TestCase):
         self.assertEqual(result["dispatch_policy"], "reuse_existing_then_create_missing_conversations")
         self.assertFalse(result["execute"])
         self.assertTrue(result["requires_confirmation"])
+
+    def test_single_task_exposes_checkpoints_and_confirmation_interrupt(self):
+        result = plan_request("开发一个已有 React 项目的项目看板网站")
+
+        graph = result["workflow_graph"]
+        node_ids = {node["node_id"] for node in graph["nodes"]}
+        self.assertIn("intake", node_ids)
+        self.assertIn("discovery", node_ids)
+        self.assertIn("confirmation", node_ids)
+        self.assertIn("verify", node_ids)
+        self.assertIn("deliver", node_ids)
+        self.assertIn("confirmation", graph["interrupts"])
+        self.assertIn("verify", graph["checkpoints"])
+
+    def test_workflow_keeps_specialist_branches_parallel_and_verify_after_all(self):
+        plan = route_task("开发网站并研究用户")
+        graph = build_workflow(
+            plan["assignments"],
+            acceptance_gates=plan["acceptance_gates"],
+            requires_confirmation=True,
+        )
+
+        execute_nodes = [node for node in graph["nodes"] if node["kind"] == "execute"]
+        self.assertEqual(len(execute_nodes), 2)
+        self.assertEqual({tuple(node["depends_on"]) for node in execute_nodes}, {("confirmation",)})
+        verify = next(node for node in graph["nodes"] if node["node_id"] == "verify")
+        self.assertEqual(set(verify["depends_on"]), {node["node_id"] for node in execute_nodes})
+        self.assertEqual(ready_nodes(graph, completed={"intake"}), ["discovery"])
+        self.assertEqual(ready_nodes(graph, completed={"intake", "discovery"}), ["confirmation"])
+        self.assertEqual(ready_nodes(graph, completed={"intake", "discovery"}, confirmed=True), [node["node_id"] for node in execute_nodes])
 
 
 class BatchSchedulerTests(unittest.TestCase):
