@@ -35,39 +35,49 @@ def build_workflow(
     *,
     acceptance_gates: list[str] | tuple[str, ...] = (),
     requires_confirmation: bool = True,
+    include_intake: bool = True,
+    include_discovery: bool = True,
+    include_learning: bool = True,
 ) -> dict[str, Any]:
     """Build a checkpointed DAG from an existing routing plan."""
-    nodes = [
-        _node(
-            "intake",
-            "intake",
-            owner="当前对话主管",
-            output_contract={"required": ["task", "goal", "success_criteria"]},
-        ),
-        _node(
-            "discovery",
-            "discovery",
-            owner="当前对话主管",
-            depends_on=("intake",),
-            output_contract={"required": ["methods", "skills", "tradeoffs", "sources"]},
-        ),
-    ]
+    nodes: list[dict[str, Any]] = []
+    previous: str | None = None
+    if include_intake:
+        nodes.append(
+            _node(
+                "intake",
+                "intake",
+                owner="当前对话主管",
+                output_contract={"required": ["task", "goal", "success_criteria"]},
+            )
+        )
+        previous = "intake"
+    if include_discovery:
+        nodes.append(
+            _node(
+                "discovery",
+                "discovery",
+                owner="当前对话主管",
+                depends_on=(previous,) if previous else (),
+                output_contract={"required": ["methods", "skills", "tradeoffs", "sources"]},
+            )
+        )
+        previous = "discovery"
 
     interrupt_ids: list[str] = []
-    confirmation_dependency = "discovery"
     if requires_confirmation:
         nodes.append(
             _node(
                 "confirmation",
                 "human_gate",
                 owner="用户",
-                depends_on=("discovery",),
+                depends_on=(previous,) if previous else (),
                 requires_confirmation=True,
                 output_contract={"required": ["approved_scope", "approved_tools", "budget"]},
             )
         )
         interrupt_ids.append("confirmation")
-        confirmation_dependency = "confirmation"
+        previous = "confirmation"
 
     execute_ids: list[str] = []
     for index, assignment in enumerate(assignments, start=1):
@@ -79,7 +89,7 @@ def build_workflow(
                 node_id,
                 "execute",
                 owner=employee_id,
-                depends_on=(confirmation_dependency,),
+                depends_on=(previous,) if previous else (),
                 output_contract={
                     "required": ["result", "evidence", "risks", "next_action"],
                     "skills": list(assignment.get("skill_ids", ())),
@@ -87,7 +97,7 @@ def build_workflow(
             )
         )
 
-    verify_dependencies = execute_ids or [confirmation_dependency]
+    verify_dependencies = execute_ids or ([previous] if previous else [])
     nodes.extend(
         [
             _node(
@@ -104,21 +114,28 @@ def build_workflow(
                 depends_on=("verify",),
                 output_contract={"required": ["artifact", "status", "known_limits"]},
             ),
+        ]
+    )
+    if include_learning:
+        nodes.append(
             _node(
                 "learn",
                 "learn",
                 owner="SKL-001",
                 depends_on=("deliver",),
                 output_contract={"required": ["score", "feedback", "root_cause", "proposal"]},
-            ),
-        ]
-    )
+            )
+        )
 
-    checkpoints = ["intake", "discovery", *execute_ids, "verify", "deliver"]
+    checkpoints = [
+        node["node_id"]
+        for node in nodes
+        if node["kind"] not in {"human_gate", "learn"}
+    ]
     return {
         "version": "1",
         "nodes": nodes,
-        "entrypoint": "intake",
+        "entrypoint": nodes[0]["node_id"],
         "interrupts": interrupt_ids,
         "checkpoints": checkpoints,
         "parallel_groups": [execute_ids] if len(execute_ids) > 1 else [],
@@ -127,6 +144,8 @@ def build_workflow(
             "durable_checkpoints": True,
             "resume_from_last_checkpoint": True,
             "human_confirmation_before_execute": requires_confirmation,
+            "discovery_included": include_discovery,
+            "learning_included": include_learning,
         },
     }
 

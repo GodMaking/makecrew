@@ -7,10 +7,11 @@ description: Set up and operate MakeCrew, an AI Company OS for routing work acro
 
 Use this skill when a user wants AI to manage a team of AI employees, coordinate coding/research/content/design work, preserve project context, reduce repeated conversation history, or add review and budget controls.
 
-For a single new task, prefer the companion `task-intake` Skill: it keeps
-clarification, skill/tool selection, confirmation, and execution in the current
-conversation. Keep MakeCrew's CEO/orchestrator path for explicit multi-task
-parallel work or cross-project decisions.
+For a single new task, prefer the companion `task-intake` Skill. It selects the
+shortest reliable path in the current conversation: routine tasks execute
+directly, while clarification, discovery, confirmation, an expert panel, and
+learning are added only when triggered. Keep MakeCrew's CEO/orchestrator path
+for explicit multi-task parallel work or cross-project decisions.
 
 ## Setup
 
@@ -40,7 +41,11 @@ perform actual conversation creation and tool execution.
 
 ## Learning loop
 
-Record score, feedback, and root cause with `LearningEngine`. Generate a proposal, replay it against representative tasks, and adopt it only when the candidate score improves the baseline. Keep proposals versioned and reviewable.
+On negative feedback, failed verification, rework, repeated issues, or an
+explicit retrospective request, record score, feedback, and root cause with
+`LearningEngine`. Generate a proposal, replay it against representative tasks,
+and adopt it only when the candidate score improves the baseline. Routine
+successful tasks do not pay a mandatory learning round.
 
 ## Output contract
 

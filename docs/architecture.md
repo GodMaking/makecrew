@@ -13,23 +13,34 @@
 
 CEO、主管和员工是可组合角色，不要求每个任务都经过全部角色。用任务规模决定流程深度。
 
-## Lifecycle
+## Adaptive lifecycle
 
-`intake -> route -> execute -> review -> deliver -> log`
+There is no mandatory full lifecycle. The router selects the smallest graph
+that still protects quality:
+
+```text
+direct:    execute -> verify -> deliver
+clarify:   intake -> route again
+discovery: discovery -> execute -> verify -> deliver
+guarded:   intake -> human_gate -> execute -> verify -> deliver
+team:      execute:* (parallel) -> verify -> deliver
+learning:  deliver -> learn  # only when a feedback/failure signal exists
+```
 
 失败进入 `rework`，必须附根因和改变后的实验；相同输入不得盲目重复。阻塞任务进入台账并可恢复，不通过复制完整历史来续接。
 
 ## Explicit workflow graph
 
-`ai_company_os.workflow.build_workflow()` turns a route into a portable DAG:
+`ai_company_os.workflow.build_workflow()` turns the selected route into a portable DAG. A full graph may look like:
 
 ```text
 intake -> discovery -> human_gate -> execute:* -> verify -> deliver -> learn
                                   \-> execute:* -/
 ```
 
-The execute nodes share one confirmation dependency and are grouped for
-parallel dispatch when they are independent. Each node declares an owner,
+Optional nodes are controlled by `include_intake`, `include_discovery`,
+`requires_confirmation`, and `include_learning`. Execute nodes share the latest
+dependency and are grouped for parallel dispatch when independent. Each node declares an owner,
 dependencies, and a minimum output contract. `ready_nodes()` calculates the
 next runnable nodes from a compact completed-node set, so a host can resume at
 the last checkpoint instead of replaying earlier model calls. A host may map

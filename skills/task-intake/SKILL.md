@@ -1,46 +1,53 @@
 ---
 name: task-intake
-description: Clarify an underspecified task, choose the best available skills and tools, and execute in the current Codex conversation after user confirmation; use CEO fan-out only for explicit multi-task batches.
+description: Select the shortest reliable path for a task: execute clear routine work directly, ask only blocking questions, discover methods only when needed, and require confirmation only for plan-first or consequential actions.
 ---
 
 # Task Intake and Execution
 
-Use this skill as the default entry point for every new task. Most users do not
-need multiple agents for one request.
+Use this skill as a lightweight router for a new task. Most requests should skip
+several stages rather than pass through one fixed pipeline.
 
 ## Default: one task, one conversation
 
 Keep the work in the current Codex conversation. Do not create a CEO handoff or
 separate employee conversation for an ordinary single task.
 
-1. Restate the requested outcome in one sentence.
-2. Identify only the missing decisions that could change the implementation.
-3. Ask at most three concise questions. Prefer questions about deliverable,
-   existing project/path, target user, constraints, success criteria, or deadline.
-4. Once the request is clear, discover suitable methods, workflows, and Skills.
-   Prefer official or primary sources, show why each candidate fits, and mark
-   local knowledge versus fresh search results. Do not install or run a new
-   Skill automatically.
-5. Present an execution brief:
+1. Classify the request before model-heavy work:
+   - clear, routine, reversible: execute now, then verify and deliver;
+   - materially ambiguous: ask only the blocking questions, up to three;
+   - explicit research/comparison request or capability gap: discover methods;
+   - explicit plan-first request or consequential action: present a brief and wait;
+   - one multi-domain task: form an implicit expert panel in this conversation;
+   - several submitted tasks: use CEO batch mode.
+2. When questions are needed, prefer deliverable, existing project/path, target
+   user, constraints, success criteria, or deadline. Zero questions is normal.
+3. Discover methods, workflows, and Skills only when the request asks for fresh
+   research/comparison or the current capability set has a real gap. Prefer
+   primary sources and label local knowledge versus fresh results.
+4. For plan-first or consequential work, present an execution brief:
    - selected skills and tools, with a reason for each;
    - candidate methods and Skills, with evidence and trade-offs;
    - planned workflow and deliverables;
    - acceptance checks and likely risks;
    - files, permissions, or user inputs still needed;
    - expected token/cost controls.
-6. Wait for the user's choice and explicit confirmation before high-cost, public, destructive, or
-   irreversible actions. A bare “继续” or “执行” confirms the presented brief
+5. Wait for the user's choice and explicit confirmation before high-cost, public, destructive, or
+   irreversible actions. A bare “continue” or “execute” confirms the presented brief
    only when no new scope has appeared.
-7. After confirmation, execute in this conversation with the selected skills.
+6. Execute in this conversation with the selected skills as soon as the chosen
+   path is ready. Routine work has no confirmation round.
    Keep the panel of experts implicit in the current context; do not narrate
    unnecessary internal handoffs or repeat the full history.
-8. Finish with evidence, changed files/links, verification, limitations, and
+7. Finish with evidence, changed files/links, verification, limitations, and
    next action. Do not claim an external action without tool evidence.
+8. Trigger learning only after negative feedback, failed verification, rework,
+   repeated issues, or an explicit retrospective request.
 
 The host may provide a `method_searcher(task, domains)` adapter for fresh web or
-repository research. If search is unavailable, use the local catalog and state
-that it is a local recommendation. Never let a search result silently change
-scope, install a package, or trigger a public action.
+repository research. Calling it is conditional, even when it is available.
+Never let a search result silently change scope, install a package, or trigger a
+public action.
 
 ## Batch mode: explicit multi-task request
 

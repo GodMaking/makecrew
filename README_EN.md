@@ -35,11 +35,11 @@ to an existing specialist first, creates a temporary employee only when no
 matching role exists, and always returns an independent QA contract. Connect a
 host dispatcher to send the payload to real employee conversations.
 
-For the common single-task path, `task-intake` first clarifies the request in
-the current conversation, discovers suitable methods and skills, shows evidence
-and trade-offs, and waits for the user's choice before execution. Most single
-tasks do not need multiple agents or a CEO. `plan_request()` keeps this flow
-local to the current conversation.
+For a single task, `task-intake` first selects the shortest reliable path.
+Clear, low-risk, reversible work executes immediately and is then verified.
+Questions, external method discovery, and confirmation are conditional steps,
+not a mandatory pipeline. Most single tasks do not need multiple agents or a
+CEO. `plan_request()` keeps this flow local to the current conversation.
 Use `plan_batch()` only for an explicit multi-task CEO fan-out.
 
 ### When to dispatch manually vs. use the CEO
@@ -58,12 +58,18 @@ Use `plan_batch()` only for an explicit multi-task CEO fan-out.
 MakeCrew does not claim CEO coordination is free. It makes the trade-off among
 Token cost, parallel speed, dependency control, and rework risk explicit.
 
-### The primary path: clarify, discover, then execute
+### Adaptive single-task routing
 
-Every new conversation follows:
+Every new request is classified before model-heavy work begins:
 
 ```text
-rough idea -> up to three questions -> method/skill discovery -> options and trade-offs -> user confirmation -> execute -> verify -> record learning
+clear routine task        -> execute -> verify -> deliver
+material ambiguity        -> ask 0-3 blocking questions -> route again
+explicit method research  -> discover methods/skills -> execute -> verify
+plan-first request         -> plan -> confirm -> execute -> verify
+public/irreversible action -> impact and rollback -> confirm -> execute
+one multi-domain task      -> in-conversation expert panel -> shared QA
+multiple submitted tasks  -> CEO batch scheduling
 ```
 
 Discovery can use the local curated catalog or a host-provided search adapter
@@ -72,18 +78,16 @@ recommendations only: they do not silently install skills, expand scope, or
 trigger public actions. This keeps one-task work efficient while retaining CEO
 fan-out for explicit multi-task requests.
 
-Each task also produces a serializable workflow graph with intake, discovery,
-confirmation, specialist execution, independent verification, delivery, and
-learning nodes. Independent specialists share a confirmation gate and can run
-in parallel; verification waits for every branch. The graph exposes durable
-checkpoints and human interrupts so a host runtime can resume work without
-replaying the full conversation. See `docs/inspiration-comparison.md` for the
-public-project comparison behind these choices.
+Each task produces a serializable workflow graph containing only the nodes it
+needs. A routine task normally has execute, verify, and deliver nodes. Intake,
+discovery, parallel specialists, confirmation, and learning are added only when
+their trigger is present. The graph exposes durable checkpoints so a host can
+resume work without replaying the full conversation.
 
-After verification, the learning loop records score, feedback, and root cause.
-Repeated failures produce a reviewable proposal; representative replay must beat
-the baseline before approval. Approval is versioned and reviewable, not a silent
-rewrite of an employee skill or route.
+Learning is event-driven. Negative user feedback, failed verification, rework,
+repeated issues, or an explicit retrospective request records score, feedback,
+and root cause. Repeated failures produce a reviewable proposal; representative
+replay must beat the baseline before adoption.
 
 ## Core flow
 
@@ -97,7 +101,9 @@ Use the task card for routing, a project context pack for stable memory, and a d
 
 See `docs/` for architecture, routing, and memory rules. Templates are in `templates/`; role prompts are in `roles/`.
 
-Start with `docs/getting-started.md`, copy prompts from `docs/prompt-pack.md`, and choose an adapter from `docs/platform-adapters.md`. The system is model- and vendor-agnostic.
+Start with `docs/getting-started.md`, read `docs/adaptive-routing.md` for the
+decision table, copy prompts from `docs/prompt-pack.md`, and choose an adapter
+from `docs/platform-adapters.md`. The system is model- and vendor-agnostic.
 
 You can bootstrap a workspace and audit host tools:
 

@@ -300,15 +300,18 @@ class OrchestrationTests(unittest.TestCase):
 
 
 class IntakePlannerTests(unittest.TestCase):
-    def test_single_task_intake_includes_method_discovery_before_confirmation(self):
-        result = plan_request("开发一个已有 React 项目的项目看板网站")
+    def test_clear_routine_task_takes_the_shortest_reliable_path(self):
+        result = plan_request("修复登录页表单校验并补测试，项目目录为 demo")
 
-        self.assertEqual(result["discovery"]["status"], "ready")
-        self.assertGreaterEqual(len(result["method_recommendations"]), 1)
-        self.assertTrue(result["method_recommendations"][0]["skill_ids"])
-        self.assertFalse(result["execute"])
-        self.assertEqual(result["learning_loop"]["stage"], "after_verification")
-        self.assertIn("replay_representative_tasks", result["learning_loop"]["steps"])
+        self.assertEqual(result["mode"], "direct")
+        self.assertEqual(result["status"], "ready_to_execute")
+        self.assertTrue(result["execute"])
+        self.assertFalse(result["requires_confirmation"])
+        self.assertEqual(result["discovery"]["status"], "skipped_not_needed")
+        self.assertEqual(result["method_recommendations"], [])
+        self.assertEqual(result["workflow"], ["执行", "验收", "交付"])
+        self.assertEqual(result["learning_loop"]["stage"], "on_signal")
+        self.assertFalse(result["learning_loop"]["enabled_for_this_task"])
 
     def test_method_searcher_is_optional_and_runs_only_after_clarity(self):
         calls = []
@@ -321,10 +324,29 @@ class IntakePlannerTests(unittest.TestCase):
         self.assertEqual(unclear["discovery"]["status"], "deferred_until_clear")
         self.assertEqual(calls, [])
 
-        clear = plan_request("研究 AI 员工框架的开源实现", method_searcher=searcher)
+        clear = plan_request("搜索并比较 AI 员工框架的开源实现", method_searcher=searcher)
         self.assertEqual(clear["discovery"]["status"], "searched")
         self.assertEqual(len(calls), 1)
         self.assertEqual(clear["method_recommendations"][0]["name"], "本地搜索方案")
+        self.assertEqual(clear["mode"], "discovery")
+        self.assertTrue(clear["execute"])
+
+    def test_reported_capability_gap_triggers_discovery(self):
+        calls = []
+
+        def searcher(task, domains):
+            calls.append((task, domains))
+            return [{"name": "补齐能力", "skill_ids": ["task-intake"]}]
+
+        result = plan_request(
+            "整理本地知识库索引",
+            method_searcher=searcher,
+            capability_gap=True,
+        )
+
+        self.assertEqual(result["mode"], "discovery")
+        self.assertEqual(result["discovery"]["reason"], "capability_gap")
+        self.assertEqual(len(calls), 1)
 
     def test_unclear_request_returns_bounded_questions_without_execution(self):
         result = plan_request("帮我做个网站")
@@ -334,11 +356,12 @@ class IntakePlannerTests(unittest.TestCase):
         self.assertTrue(result["single_conversation"])
         self.assertFalse(result["execute"])
 
-    def test_clear_request_builds_panel_plan_and_waits_for_confirmation(self):
+    def test_explicit_plan_request_waits_for_confirmation(self):
         result = plan_request(
-            "为小团队做一个可部署的项目看板网站，已有 React 项目，目标是下周给客户演示"
+            "先给方案不要执行：为小团队开发已有 React 项目看板，下周给客户演示"
         )
 
+        self.assertEqual(result["mode"], "plan_first")
         self.assertEqual(result["status"], "ready_for_confirmation")
         self.assertTrue(result["single_conversation"])
         self.assertFalse(result["execute"])
@@ -349,7 +372,7 @@ class IntakePlannerTests(unittest.TestCase):
 
     def test_confirmation_unlocks_execution_without_ceo_handoff(self):
         result = plan_request(
-            "修复登录页表单校验并补测试，项目目录为 demo，不能改变现有接口",
+            "先给方案：修复登录页表单校验并补测试，项目目录为 demo，不改变现有接口",
             confirmed=True,
         )
 
@@ -358,12 +381,23 @@ class IntakePlannerTests(unittest.TestCase):
         self.assertEqual(result["lead"], "当前对话主管")
         self.assertNotIn("CEO", result["workflow"])
 
-    def test_public_action_keeps_confirmation_even_when_request_is_clear(self):
+    def test_public_action_waits_once_and_confirmation_unlocks_it(self):
+        waiting = plan_request("把这个网站发布到生产环境")
         result = plan_request("把这个网站发布到生产环境", confirmed=True)
 
+        self.assertEqual(waiting["mode"], "guarded")
+        self.assertTrue(waiting["requires_confirmation"])
+        self.assertFalse(waiting["execute"])
         self.assertTrue(result["requires_confirmation"])
-        self.assertFalse(result["execute"])
-        self.assertIn("生产发布确认", result["questions"])
+        self.assertTrue(result["execute"])
+
+    def test_one_multi_domain_task_uses_current_conversation_expert_panel(self):
+        result = plan_request("开发网站并研究目标用户")
+
+        self.assertEqual(result["mode"], "team")
+        self.assertEqual(result["execution_route"], "current_conversation_expert_panel")
+        self.assertNotEqual(result["lead"], "CEO")
+        self.assertTrue(result["execute"])
 
     def test_batch_mode_routes_independent_tasks_to_ceo(self):
         result = plan_batch([
@@ -379,18 +413,34 @@ class IntakePlannerTests(unittest.TestCase):
         self.assertFalse(result["execute"])
         self.assertTrue(result["requires_confirmation"])
 
-    def test_single_task_exposes_checkpoints_and_confirmation_interrupt(self):
-        result = plan_request("开发一个已有 React 项目的项目看板网站")
+    def test_direct_workflow_omits_discovery_confirmation_and_learning(self):
+        result = plan_request("修复登录页表单校验并补测试，项目目录为 demo")
 
         graph = result["workflow_graph"]
         node_ids = {node["node_id"] for node in graph["nodes"]}
-        self.assertIn("intake", node_ids)
-        self.assertIn("discovery", node_ids)
-        self.assertIn("confirmation", node_ids)
+        self.assertNotIn("intake", node_ids)
+        self.assertNotIn("discovery", node_ids)
+        self.assertNotIn("confirmation", node_ids)
+        self.assertNotIn("learn", node_ids)
         self.assertIn("verify", node_ids)
         self.assertIn("deliver", node_ids)
-        self.assertIn("confirmation", graph["interrupts"])
         self.assertIn("verify", graph["checkpoints"])
+
+    def test_learning_is_event_driven_instead_of_mandatory(self):
+        result = plan_request(
+            "修复登录页表单校验并补测试，项目目录为 demo",
+            learning_signal=True,
+        )
+
+        self.assertTrue(result["learning_loop"]["enabled_for_this_task"])
+        self.assertIn("learn", {node["node_id"] for node in result["workflow_graph"]["nodes"]})
+
+    def test_negative_feedback_text_automatically_triggers_learning(self):
+        result = plan_request("登录页修复结果不合格，需要返工并复盘")
+
+        self.assertTrue(result["learning_loop"]["enabled_for_this_task"])
+        self.assertEqual(result["learning_loop"]["trigger_reason"], "task_feedback")
+        self.assertIn("learn", {node["node_id"] for node in result["workflow_graph"]["nodes"]})
 
     def test_workflow_keeps_specialist_branches_parallel_and_verify_after_all(self):
         plan = route_task("开发网站并研究用户")

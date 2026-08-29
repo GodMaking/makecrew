@@ -16,6 +16,19 @@ from .workflow import build_workflow
 
 MAX_QUESTIONS = 3
 
+PLAN_FIRST_HINTS = (
+    "先给方案", "先出方案", "先别执行", "不要执行", "确认后执行",
+    "先规划", "先策划", "先分析方案",
+)
+DISCOVERY_HINTS = (
+    "搜索", "搜一下", "查找", "调研", "研究", "比较", "对比",
+    "推荐", "最佳", "最适合", "方法", "skill", "插件", "开源实现", "借鉴",
+)
+LEARNING_HINTS = (
+    "差评", "不合格", "返工", "失败", "重复问题", "复盘", "训练员工",
+    "效果差", "没做好", "又错", "垃圾",
+)
+
 
 def _question_for(task: str, plan: dict[str, Any]) -> list[str]:
     questions: list[str] = []
@@ -46,37 +59,102 @@ def _skills_for(domains: list[str], task: str) -> list[str]:
     return list(dict.fromkeys(skills))
 
 
+def _request_mode(
+    task: str,
+    plan: dict[str, Any],
+    *,
+    unclear: bool,
+    capability_gap: bool,
+) -> tuple[str, bool, bool]:
+    """Return mode, confirmation requirement, and discovery requirement."""
+    public_or_strategy = plan["requires_user_confirmation"]
+    plan_first = any(hint in task for hint in PLAN_FIRST_HINTS)
+    discovery_needed = capability_gap or any(hint in task.lower() for hint in DISCOVERY_HINTS)
+    if unclear:
+        return "clarify", False, False
+    if public_or_strategy:
+        return "guarded", True, discovery_needed
+    if plan_first:
+        return "plan_first", True, discovery_needed
+    if len(plan["domains"]) > 1:
+        return "team", False, discovery_needed
+    if discovery_needed:
+        return "discovery", False, True
+    return "direct", False, False
+
+
+def _workflow_for(mode: str, *, learning_signal: bool) -> list[str]:
+    workflows = {
+        "clarify": ["补充关键信息"],
+        "direct": ["执行", "验收", "交付"],
+        "discovery": ["方法/Skill 发现", "执行", "验收", "交付"],
+        "team": ["动态组队", "并行执行", "统一验收", "交付"],
+        "plan_first": ["形成方案", "用户确认", "执行", "验收", "交付"],
+        "guarded": ["确认目标与影响", "用户确认", "执行", "验收", "交付"],
+    }
+    steps = list(workflows[mode])
+    if learning_signal:
+        steps.append("学习记录")
+    return steps
+
+
 def plan_request(
     task: str,
     *,
     confirmed: bool = False,
     method_searcher: MethodSearcher | None = None,
+    learning_signal: bool = False,
+    capability_gap: bool = False,
 ) -> dict[str, Any]:
-    """Plan one task in the current conversation and gate execution."""
+    """Choose the shortest reliable path for one task."""
     clean = task.strip()
     plan = route_task(clean)
-    questions = _question_for(clean, plan)
-    discovery = discover_methods(clean, plan["domains"], searcher=method_searcher)
     public_action = any(word in clean for word in PUBLIC_ACTIONS)
     unclear = plan["needs_clarification"] or (len(clean) < 8 and not public_action)
-    requires_confirmation = True
+    feedback_signal = any(hint in clean for hint in LEARNING_HINTS)
+    learning_enabled = learning_signal or feedback_signal
+    mode, requires_confirmation, discovery_needed = _request_mode(
+        clean,
+        plan,
+        unclear=unclear,
+        capability_gap=capability_gap,
+    )
+    questions = _question_for(clean, plan) if unclear else []
+    if mode == "guarded" and not confirmed:
+        questions = ["生产发布确认"] if public_action else []
+
+    if unclear:
+        discovery = discover_methods(clean, ["待澄清"])
+    elif discovery_needed:
+        discovery = discover_methods(clean, plan["domains"], searcher=method_searcher)
+    else:
+        discovery = {
+            "status": "skipped_not_needed",
+            "query": clean,
+            "methods": [],
+            "search_error": "",
+        }
 
     if unclear:
         status = "needs_clarification"
-    elif public_action and confirmed:
-        # Production/public changes require a fresh, explicit confirmation
-        # after target and rollback details are visible to the user.
-        status = "needs_confirmation"
-        if "生产发布确认" not in questions:
-            questions.append("生产发布确认")
-        questions = questions[:MAX_QUESTIONS]
-    elif confirmed:
-        status = "ready_to_execute"
-    else:
+    elif requires_confirmation and not confirmed:
         status = "ready_for_confirmation"
+    else:
+        status = "ready_to_execute"
+
+    include_intake = mode in {"clarify", "plan_first", "guarded"}
+    workflow_graph = build_workflow(
+        plan["assignments"],
+        acceptance_gates=plan["acceptance_gates"],
+        requires_confirmation=requires_confirmation,
+        include_intake=include_intake,
+        include_discovery=discovery_needed,
+        include_learning=learning_enabled,
+    )
 
     return {
         "task": clean,
+        "mode": mode,
         "status": status,
         "single_conversation": True,
         "lead": "当前对话主管",
@@ -86,29 +164,30 @@ def plan_request(
         "discovery": {
             "status": discovery["status"],
             "search_error": discovery["search_error"],
-            "user_selects_before_execution": True,
+            "triggered": discovery_needed,
+            "reason": "capability_gap" if capability_gap else "user_request" if discovery_needed else "not_needed",
+            "user_selects_before_execution": requires_confirmation,
         },
         "tools": sorted({tool for item in plan["assignments"] for tool in item["tools"]}),
-        "workflow": ["需求澄清", "工具与 Skill 规划", "用户确认", "执行", "验收"],
+        "workflow": _workflow_for(mode, learning_signal=learning_enabled),
         "questions": questions,
         "question_details": {
             "生产发布确认": "请确认目标环境、域名/账号、发布版本、发布时间和回滚方案。"
         } if public_action else {},
         "acceptance_gates": plan["acceptance_gates"],
-        "workflow_graph": build_workflow(
-            plan["assignments"],
-            acceptance_gates=plan["acceptance_gates"],
-            requires_confirmation=requires_confirmation,
-        ),
+        "workflow_graph": workflow_graph,
         "learning_loop": {
-            "stage": "after_verification",
+            "stage": "on_signal",
+            "enabled_for_this_task": learning_enabled,
+            "trigger_reason": "explicit_signal" if learning_signal else "task_feedback" if feedback_signal else "none",
+            "triggers": ["用户差评", "验收失败", "返工", "重复问题", "用户明确要求复盘"],
             "steps": ["record_score_feedback_root_cause", "propose_small_change", "replay_representative_tasks", "approve_only_if_score_improves"],
             "automatic_mutation": False,
             "storage": ".makecrew/learning.json (optional)",
         },
         "requires_confirmation": requires_confirmation,
         "execute": status == "ready_to_execute",
-        "execution_route": "current_conversation_panel",
+        "execution_route": "current_conversation_expert_panel" if mode == "team" else "current_conversation",
         "token_policy": "只保留当前任务必要上下文，不复制完整员工历史",
     }
 

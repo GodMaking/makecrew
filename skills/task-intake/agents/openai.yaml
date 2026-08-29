@@ -1,8 +1,8 @@
 interface:
   display_name: "Task Intake"
-  short_description: "先完善需求、发现方法与 Skill，再在当前对话执行"
+  short_description: "按任务选择直达、澄清、发现、确认或协作路径"
   brand_color: "#1769E0"
-  default_prompt: "Use $task-intake to clarify my request, discover suitable methods and skills, show trade-offs and the execution brief, then wait for my confirmation before starting."
+  default_prompt: "Use $task-intake to choose the shortest reliable path: execute clear routine work directly; ask only blocking questions; discover methods only when needed; wait for confirmation only for plan-first or consequential actions."
 
 policy:
   allow_implicit_invocation: true
