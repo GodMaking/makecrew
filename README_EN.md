@@ -29,6 +29,7 @@ needs, while keeping the work verifiable, resumable, and improvable.
 | Evidence-gated self-evolution | Feedback and repeated failures produce proposals that must beat a replay baseline before review | Event-triggered learning, baseline/candidate scoring, reviewable proposals |
 | Vendor-neutral, local-first core | The same roles, templates, and scheduler can connect to different AI platforms | Dependency-free Python runtime and explicit host adapter boundary |
 | Transparent execution state | Local planning works without an API key and reports queued work honestly until an executor is connected | Local rule router and serializable plans |
+| Progressive Skill disclosure | Load only metadata at inventory time, instructions after matching, and references/scripts on demand | `load_policy` separates metadata, instructions, and resources |
 
 ## User-defined team size
 
@@ -123,10 +124,13 @@ with current capabilities. Methods follow the same local-first rule, with
 broader search for fresh comparisons, local misses, or capability gaps.
 
 Each task produces a serializable workflow graph containing only the nodes it
-needs. A routine task normally has execute, verify, and deliver nodes. Intake,
-discovery, parallel specialists, confirmation, and learning are added only when
-their trigger is present. The graph exposes durable checkpoints so a host can
-resume work without replaying the full conversation.
+needs. A routine task normally has local matching, execute, verify, and deliver
+nodes. Intake, external discovery, parallel specialists, confirmation, and
+learning are added only when their trigger is present. The graph exposes durable
+checkpoints so a host can resume work without replaying the full conversation.
+
+See [`docs/open-source-benchmark.md`](docs/open-source-benchmark.md) for the
+public-project comparison and the implementation priorities chosen from it.
 
 Learning is event-driven. Negative user feedback, failed verification, rework,
 repeated issues, or an explicit retrospective request records score, feedback,

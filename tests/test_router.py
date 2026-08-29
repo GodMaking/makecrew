@@ -312,6 +312,7 @@ class IntakePlannerTests(unittest.TestCase):
         self.assertTrue(result["skill_resolution"]["local_checked"])
         self.assertTrue(result["skill_resolution"]["matched_skill_ids"])
         self.assertFalse(result["skill_resolution"]["requires_user_decision"])
+        self.assertEqual(result["skill_resolution"]["load_policy"]["instructions"], "load_after_match")
         self.assertEqual(result["workflow"], ["执行", "验收", "交付"])
         self.assertEqual(result["learning_loop"]["stage"], "on_signal")
         self.assertFalse(result["learning_loop"]["enabled_for_this_task"])
@@ -364,6 +365,7 @@ class IntakePlannerTests(unittest.TestCase):
         self.assertTrue(result["skill_resolution"]["requires_user_decision"])
         self.assertTrue(result["skill_resolution"]["candidates"])
         self.assertIn("安装", result["skill_resolution"]["decision_prompt"])
+        self.assertEqual(result["skill_resolution"]["load_policy"]["references_and_scripts"], "load_on_demand")
 
     def test_missing_skills_request_search_adapter_when_host_has_none(self):
         result = plan_request(

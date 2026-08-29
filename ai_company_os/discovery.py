@@ -13,6 +13,12 @@ from typing import Any, Callable
 MethodSearcher = Callable[[str, list[str]], list[dict[str, Any]]]
 SkillSearcher = Callable[[str, list[str]], list[dict[str, Any]]]
 
+PROGRESSIVE_DISCLOSURE_POLICY = {
+    "metadata": "startup_or_inventory",
+    "instructions": "load_after_match",
+    "references_and_scripts": "load_on_demand",
+}
+
 LOCAL_METHODS: dict[str, list[dict[str, Any]]] = {
     "工程": [{
         "name": "规格先行 + 增量实现",
@@ -156,6 +162,7 @@ def resolve_skills(
             "search_error": "",
             "requires_user_decision": False,
             "decision_prompt": "",
+            "load_policy": PROGRESSIVE_DISCLOSURE_POLICY.copy(),
         }
 
     matched = [skill_id for skill_id in required if skill_id in installed]
@@ -172,6 +179,7 @@ def resolve_skills(
             "search_error": "",
             "requires_user_decision": False,
             "decision_prompt": "",
+            "load_policy": PROGRESSIVE_DISCLOSURE_POLICY.copy(),
         }
 
     if searcher is None:
@@ -186,6 +194,7 @@ def resolve_skills(
             "search_error": "",
             "requires_user_decision": False,
             "decision_prompt": "请启用宿主 Skill 搜索能力，查找缺失能力的候选实现。",
+            "load_policy": PROGRESSIVE_DISCLOSURE_POLICY.copy(),
         }
 
     try:
@@ -211,6 +220,7 @@ def resolve_skills(
             "search_error": f"{type(exc).__name__}: {exc}",
             "requires_user_decision": False,
             "decision_prompt": "保留已匹配 Skill，修复搜索适配器后继续查找缺失能力。",
+            "load_policy": PROGRESSIVE_DISCLOSURE_POLICY.copy(),
         }
 
     if not deduped:
@@ -225,6 +235,7 @@ def resolve_skills(
             "search_error": "",
             "requires_user_decision": False,
             "decision_prompt": "当前没有找到合适候选，可调整搜索来源或由现有能力执行。",
+            "load_policy": PROGRESSIVE_DISCLOSURE_POLICY.copy(),
         }
 
     return {
@@ -238,4 +249,5 @@ def resolve_skills(
         "search_error": "",
         "requires_user_decision": True,
         "decision_prompt": "本地缺少部分匹配 Skill。请选择是否安装并使用上述候选，或继续使用现有能力。",
+        "load_policy": PROGRESSIVE_DISCLOSURE_POLICY.copy(),
     }

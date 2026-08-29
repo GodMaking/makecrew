@@ -33,8 +33,12 @@ CEO fan-out only for explicit multi-task concurrency.
 9. Auditable employee-to-skill matrix with portable local adapters and traced
    upstream references.
 10. Single-task intake that clarifies vague requests, discovers methods and
-   Skills, asks for a choice, and executes in the same conversation.
-11. Evidence-based self-evolution after verification: feedback, root-cause
+   Skills, asks for a choice when a local capability is missing, and executes in
+   the same conversation.
+11. Local-first Skill and method matching: inspect installed Skill metadata for
+   every clear task, load matched instructions progressively, and search external
+   candidates only for unresolved gaps or fresh method comparisons.
+12. Evidence-based self-evolution after verification: feedback, root-cause
    proposals, replay comparison, and reviewable adoption.
 
 ## Employee sizing
