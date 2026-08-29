@@ -22,7 +22,17 @@ MakeCrew 是一个面向多 Agent 团队的轻量 AI Company OS：把一个目�
 
 MakeCrew 适合个人创作者、独立开发者、研究者、内容团队和正在搭建 AI 工作流的新手。它先建立清晰的岗位和流程，再逐步接入更多 Skill 与工具。
 
-默认使用 `task-intake`：每次新任务在当前对话内先澄清需求，再选择最佳 Skill、工具和验收流程，得到确认后执行。只有一次提出多个任务或明确要求并发时，才启用 CEO 批量调度。
+默认使用 `task-intake`：新建一个对话后，先在当前对话完善模糊需求，再搜索或整理最适合的实现方法、工作流和 Skill，展示证据与取舍，用户确认后才执行。大多数单任务不需要多个 Agent，也不经过 CEO；只有一次提出多个任务或明确要求并发时，才启用 CEO 批量调度。
+
+### MakeCrew 的第一功能：单任务先理解，再执行
+
+每个新对话都遵循同一条低成本主路径：
+
+```text
+模糊想法 -> 最多三问 -> 方法/Skill 发现 -> 候选方案与取舍 -> 用户确认 -> 当前对话执行 -> 验收
+```
+
+“方法/Skill 发现”可以使用本地精选目录，也可以由宿主平台注入搜索适配器获取最新的官方文档或开源实现。搜索结果只作为候选，不会自动安装、扩大范围或直接执行；用户选择后，`task-intake` 才锁定 Skill、工具、交付物和验收标准。这样单任务无需 CEO 转述，减少上下文复制和 Token 消耗，同时保留复杂任务需要时的多 Agent 协作能力。
 
 ### 什么时候手动派发，什么时候找 CEO
 
@@ -160,6 +170,7 @@ python -m ai_company_os.web
 - `ai_company_os.learning`：验收反馈、改进提案和回放评分
 - `ai_company_os.orchestrator.CrewOrchestrator`：读取员工注册表，优先派给现有员工；缺少岗位时创建临时员工，并返回独立验收任务
 - `ai_company_os.intake.plan_request()`：单任务需求澄清、Skill/工具规划和执行确认
+- `ai_company_os.discovery.discover_methods()`：根据任务返回可追溯的本地方法建议，并支持宿主搜索器注入最新候选
 - `ai_company_os.intake.plan_batch()`：多任务 CEO 批量调度方案
 - `ai_company_os.batch.BatchScheduler`：依赖图、并发上限、批次/单任务工具预算、暂停恢复、取消、失败记录和员工线程复用
 

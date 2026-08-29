@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from .router import PUBLIC_ACTIONS, route_task
+from .discovery import MethodSearcher, discover_methods
 
 
 MAX_QUESTIONS = 3
@@ -44,11 +45,17 @@ def _skills_for(domains: list[str], task: str) -> list[str]:
     return list(dict.fromkeys(skills))
 
 
-def plan_request(task: str, *, confirmed: bool = False) -> dict[str, Any]:
+def plan_request(
+    task: str,
+    *,
+    confirmed: bool = False,
+    method_searcher: MethodSearcher | None = None,
+) -> dict[str, Any]:
     """Plan one task in the current conversation and gate execution."""
     clean = task.strip()
     plan = route_task(clean)
     questions = _question_for(clean, plan)
+    discovery = discover_methods(clean, plan["domains"], searcher=method_searcher)
     public_action = any(word in clean for word in PUBLIC_ACTIONS)
     unclear = plan["needs_clarification"] or (len(clean) < 8 and not public_action)
     requires_confirmation = True
@@ -74,6 +81,12 @@ def plan_request(task: str, *, confirmed: bool = False) -> dict[str, Any]:
         "lead": "当前对话主管",
         "experts": plan["domains"] if plan["domains"] != ["待澄清"] else [],
         "skills": _skills_for(plan["domains"], clean),
+        "method_recommendations": discovery["methods"],
+        "discovery": {
+            "status": discovery["status"],
+            "search_error": discovery["search_error"],
+            "user_selects_before_execution": True,
+        },
         "tools": sorted({tool for item in plan["assignments"] for tool in item["tools"]}),
         "workflow": ["需求澄清", "工具与 Skill 规划", "用户确认", "执行", "验收"],
         "questions": questions,

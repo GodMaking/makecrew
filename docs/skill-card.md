@@ -30,6 +30,8 @@ conversation. Use CEO fan-out only for explicit multi-task concurrency.
    employee-thread reuse.
 9. Auditable employee-to-skill matrix with portable local adapters and traced
    upstream references.
+10. Single-task intake that clarifies vague requests, discovers methods and
+   Skills, asks for a choice, and executes in the same conversation.
 
 ## Employee sizing
 

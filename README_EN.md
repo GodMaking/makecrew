@@ -35,8 +35,11 @@ to an existing specialist first, creates a temporary employee only when no
 matching role exists, and always returns an independent QA contract. Connect a
 host dispatcher to send the payload to real employee conversations.
 
-For the common single-task path, `plan_request()` keeps clarification,
-skill/tool selection, confirmation, and execution in the current conversation.
+For the common single-task path, `task-intake` first clarifies the request in
+the current conversation, discovers suitable methods and skills, shows evidence
+and trade-offs, and waits for the user's choice before execution. Most single
+tasks do not need multiple agents or a CEO. `plan_request()` keeps this flow
+local to the current conversation.
 Use `plan_batch()` only for an explicit multi-task CEO fan-out.
 
 ### When to dispatch manually vs. use the CEO
@@ -54,6 +57,20 @@ Use `plan_batch()` only for an explicit multi-task CEO fan-out.
 
 MakeCrew does not claim CEO coordination is free. It makes the trade-off among
 Token cost, parallel speed, dependency control, and rework risk explicit.
+
+### The primary path: clarify, discover, then execute
+
+Every new conversation follows:
+
+```text
+rough idea -> up to three questions -> method/skill discovery -> options and trade-offs -> user confirmation -> execute -> verify
+```
+
+Discovery can use the local curated catalog or a host-provided search adapter
+for fresh official documentation and open-source methods. Results are
+recommendations only: they do not silently install skills, expand scope, or
+trigger public actions. This keeps one-task work efficient while retaining CEO
+fan-out for explicit multi-task requests.
 
 ## Core flow
 

@@ -100,6 +100,7 @@ class RouteTaskTests(unittest.TestCase):
         self.assertIn("构建或测试结果", page)
         self.assertIn("ENG-001", page)
         self.assertIn("恢复策略", page)
+        self.assertIn("推荐方法与 Skill", page)
 
     def test_local_http_demo_serves_a_plan(self):
         server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
@@ -284,6 +285,30 @@ class OrchestrationTests(unittest.TestCase):
 
 
 class IntakePlannerTests(unittest.TestCase):
+    def test_single_task_intake_includes_method_discovery_before_confirmation(self):
+        result = plan_request("开发一个已有 React 项目的项目看板网站")
+
+        self.assertEqual(result["discovery"]["status"], "ready")
+        self.assertGreaterEqual(len(result["method_recommendations"]), 1)
+        self.assertTrue(result["method_recommendations"][0]["skill_ids"])
+        self.assertFalse(result["execute"])
+
+    def test_method_searcher_is_optional_and_runs_only_after_clarity(self):
+        calls = []
+
+        def searcher(task, domains):
+            calls.append((task, domains))
+            return [{"name": "本地搜索方案", "why": "与目标匹配", "skill_ids": ["task-intake"]}]
+
+        unclear = plan_request("帮我处理一下", method_searcher=searcher)
+        self.assertEqual(unclear["discovery"]["status"], "deferred_until_clear")
+        self.assertEqual(calls, [])
+
+        clear = plan_request("研究 AI 员工框架的开源实现", method_searcher=searcher)
+        self.assertEqual(clear["discovery"]["status"], "searched")
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(clear["method_recommendations"][0]["name"], "本地搜索方案")
+
     def test_unclear_request_returns_bounded_questions_without_execution(self):
         result = plan_request("帮我做个网站")
 
