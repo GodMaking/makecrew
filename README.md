@@ -10,7 +10,7 @@ MakeCrew 是一个面向多 Agent 团队的轻量 AI Company OS：把一个目�
 
 ## 新手先看这里
 
-如果你刚开始使用 AI，却已经遇到“对话太多、Skill 不会自动调用、项目记忆容易丢、多个任务没人协调”等问题，MakeCrew 可以作为你的第一层 AI 工作管理系统。
+如果你刚开始使用 AI，却已经遇到“需求说不清、Skill 不会自动调用、项目记忆容易丢、多个任务没人协调”等问题，MakeCrew 可以作为你的第一层 AI 工作管理系统。
 
 你只需要把本仓库交给自己的 AI，并发送：
 
@@ -21,6 +21,8 @@ MakeCrew 是一个面向多 Agent 团队的轻量 AI Company OS：把一个目�
 ```
 
 MakeCrew 适合个人创作者、独立开发者、研究者、内容团队和正在搭建 AI 工作流的新手。它先建立清晰的岗位和流程，再逐步接入更多 Skill 与工具。
+
+默认使用 `task-intake`：每次新任务在当前对话内先澄清需求，再选择最佳 Skill、工具和验收流程，得到确认后执行。只有一次提出多个任务或明确要求并发时，才启用 CEO 批量调度。
 
 ## 员工数量由你决定
 
@@ -124,6 +126,8 @@ makecrew audit --tools filesystem,shell,browser,web_search
 # 在仓库目录执行
 python -m ai_company_os.cli "开发网站并准备上线，同时研究用户并写宣传文案" --project demo-site
 python -m ai_company_os.bootstrap_cli dispatch "修复登录页面的表单校验" --path ./my-ai-workspace --project demo-site
+python -m ai_company_os.bootstrap_cli intake "修复登录页面的表单校验并补测试"
+python -m ai_company_os.bootstrap_cli batch-plan "整理竞品资料" "写宣传文案" "修复登录页"
 python -m ai_company_os.web
 ```
 
@@ -138,6 +142,8 @@ python -m ai_company_os.web
 - `ai_company_os.task_state`：可恢复任务台账和用量记录（传入 JSON 路径即可跨重启恢复）
 - `ai_company_os.learning`：验收反馈、改进提案和回放评分
 - `ai_company_os.orchestrator.CrewOrchestrator`：读取员工注册表，优先派给现有员工；缺少岗位时创建临时员工，并返回独立验收任务
+- `ai_company_os.intake.plan_request()`：单任务需求澄清、Skill/工具规划和执行确认
+- `ai_company_os.intake.plan_batch()`：多任务 CEO 批量调度方案
 
 ### 当前能力边界
 

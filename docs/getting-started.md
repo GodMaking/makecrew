@@ -50,6 +50,15 @@ result = CrewOrchestrator("./my-ai-workspace", dispatcher=send_to_employee).disp
 一次性任务则调用 `archive(employee_id)` 归档。CEO 只做决策和派单，
 不会因为缺少专业岗位而默默代做。
 
+## 默认单任务入口
+
+新开一个 Codex 对话后，先使用 `task-intake` Skill。它会在当前对话内
+完成需求澄清、Skill/工具选择和验收设计；你确认执行简报后才开始高成本步骤。
+这条路径不经过 CEO，不创建额外员工对话，也不复制完整历史。
+
+只有你一次发来多个独立任务，或明确要求并发处理时，才使用 CEO 批量模式：
+CEO 为每项任务复用已有员工，缺岗位时自动创建对应的新对话，并行派发后统一汇报。
+
 ## 方式 B：一个对话模拟完整流程
 
 当平台不方便创建多个对话时，把 `roles/ceo.md`、`roles/project-manager.md` 和 `roles/worker.md` 作为三个角色段落放进同一系统提示词，并要求模型在每个任务开头输出当前路由。小任务仍走直达员工模式。

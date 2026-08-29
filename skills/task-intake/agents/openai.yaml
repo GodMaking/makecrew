@@ -1,0 +1,8 @@
+interface:
+  display_name: "Task Intake"
+  short_description: "澄清需求并规划当前对话执行"
+  brand_color: "#1769E0"
+  default_prompt: "Use $task-intake to clarify my request, select the best skills and tools, and show me the execution brief before starting."
+
+policy:
+  allow_implicit_invocation: true

@@ -14,6 +14,7 @@ from ai_company_os.web import render_result
 from ai_company_os.web import Handler
 from http.server import ThreadingHTTPServer
 from ai_company_os.orchestrator import CrewOrchestrator
+from ai_company_os.intake import plan_batch, plan_request
 
 
 class RouteTaskTests(unittest.TestCase):
@@ -264,6 +265,61 @@ class OrchestrationTests(unittest.TestCase):
             self.assertEqual(promoted["kind"], "custom")
             self.assertEqual(registry[result["executor_id"]]["kind"], "custom")
             self.assertEqual(registry["CEO-001"]["kind"], "core")
+
+
+class IntakePlannerTests(unittest.TestCase):
+    def test_unclear_request_returns_bounded_questions_without_execution(self):
+        result = plan_request("帮我做个网站")
+
+        self.assertEqual(result["status"], "needs_clarification")
+        self.assertLessEqual(len(result["questions"]), 3)
+        self.assertTrue(result["single_conversation"])
+        self.assertFalse(result["execute"])
+
+    def test_clear_request_builds_panel_plan_and_waits_for_confirmation(self):
+        result = plan_request(
+            "为小团队做一个可部署的项目看板网站，已有 React 项目，目标是下周给客户演示"
+        )
+
+        self.assertEqual(result["status"], "ready_for_confirmation")
+        self.assertTrue(result["single_conversation"])
+        self.assertFalse(result["execute"])
+        self.assertIn("工程", result["experts"])
+        self.assertIn("frontend-ui-engineering", result["skills"])
+        self.assertIn("验收", result["workflow"])
+        self.assertTrue(result["requires_confirmation"])
+
+    def test_confirmation_unlocks_execution_without_ceo_handoff(self):
+        result = plan_request(
+            "修复登录页表单校验并补测试，项目目录为 demo，不能改变现有接口",
+            confirmed=True,
+        )
+
+        self.assertEqual(result["status"], "ready_to_execute")
+        self.assertTrue(result["execute"])
+        self.assertEqual(result["lead"], "当前对话主管")
+        self.assertNotIn("CEO", result["workflow"])
+
+    def test_public_action_keeps_confirmation_even_when_request_is_clear(self):
+        result = plan_request("把这个网站发布到生产环境", confirmed=True)
+
+        self.assertTrue(result["requires_confirmation"])
+        self.assertFalse(result["execute"])
+        self.assertIn("生产发布确认", result["questions"])
+
+    def test_batch_mode_routes_independent_tasks_to_ceo(self):
+        result = plan_batch([
+            "修复登录页表单校验",
+            "整理竞品资料",
+            "写一版宣传文案",
+        ])
+
+        self.assertEqual(result["mode"], "batch")
+        self.assertEqual(result["lead"], "CEO")
+        self.assertEqual(result["task_count"], 3)
+        self.assertEqual(result["dispatch_policy"], "reuse_existing_then_create_missing_conversations")
+        self.assertFalse(result["execute"])
+        self.assertTrue(result["requires_confirmation"])
 
 
 if __name__ == "__main__":

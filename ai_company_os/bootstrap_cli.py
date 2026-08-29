@@ -7,6 +7,7 @@ import json
 
 from .bootstrap import audit_tools, initialize_workspace, register_employee
 from .orchestrator import CrewOrchestrator
+from .intake import plan_batch, plan_request
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -34,6 +35,13 @@ def main(argv: list[str] | None = None) -> int:
     dispatch.add_argument("--path", default=".", help="workspace directory")
     dispatch.add_argument("--project", default="", help="project name")
 
+    intake = subparsers.add_parser("intake", help="clarify and plan one task")
+    intake.add_argument("task", nargs="+", help="task description")
+    intake.add_argument("--confirmed", action="store_true", help="confirm the displayed plan")
+
+    batch = subparsers.add_parser("batch-plan", help="plan multiple tasks for CEO fan-out")
+    batch.add_argument("tasks", nargs="+", help="independent task descriptions")
+
     args = parser.parse_args(argv)
     if args.command == "init":
         result = initialize_workspace(args.path, project=args.project)
@@ -48,6 +56,10 @@ def main(argv: list[str] | None = None) -> int:
             "tools": [item.strip() for item in args.tools.split(",") if item.strip()],
             "memory_scope": args.memory_scope,
         })
+    elif args.command == "intake":
+        result = plan_request(" ".join(args.task), confirmed=args.confirmed)
+    elif args.command == "batch-plan":
+        result = plan_batch(args.tasks)
     else:
         result = CrewOrchestrator(args.path).dispatch(" ".join(args.task), project=args.project)
     print(json.dumps(result, ensure_ascii=False, indent=2))

@@ -35,6 +35,10 @@ to an existing specialist first, creates a temporary employee only when no
 matching role exists, and always returns an independent QA contract. Connect a
 host dispatcher to send the payload to real employee conversations.
 
+For the common single-task path, `plan_request()` keeps clarification,
+skill/tool selection, confirmation, and execution in the current conversation.
+Use `plan_batch()` only for an explicit multi-task CEO fan-out.
+
 ## Core flow
 
 ```text

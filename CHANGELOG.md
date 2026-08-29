@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `task-intake` Skill：单任务在当前对话内完成需求澄清、Skill/工具规划、确认和执行。
+- `plan_batch()`：显式多任务请求继续使用 CEO 批量拆分和并发调度。
+- 单任务最多三项关键澄清问题、执行简报和不可逆操作确认门禁。
+
+### Changed
+- MakeCrew 默认推荐单任务入口，CEO 调度保留给多任务并发和跨项目决策。
+
 ## 0.2.0 - 2026-08-28
 
 - Added role prompts for CEO, project lead, and specialist workers.

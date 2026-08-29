@@ -7,6 +7,11 @@ description: Set up and operate MakeCrew, an AI Company OS for routing work acro
 
 Use this skill when a user wants AI to manage a team of AI employees, coordinate coding/research/content/design work, preserve project context, reduce repeated conversation history, or add review and budget controls.
 
+For a single new task, prefer the companion `task-intake` Skill: it keeps
+clarification, skill/tool selection, confirmation, and execution in the current
+conversation. Keep MakeCrew's CEO/orchestrator path for explicit multi-task
+parallel work or cross-project decisions.
+
 ## Setup
 
 1. Read `README.md`, `docs/getting-started.md`, `docs/platform-adapters.md`, and `docs/skill-card.md`.
