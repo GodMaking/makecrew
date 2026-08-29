@@ -16,7 +16,7 @@ BUNDLED_SKILLS = (
     "parallel-dispatch", "verification-before-completion", "test-driven-development",
     "source-driven-development", "frontend-ui-engineering", "api-and-interface-design",
     "git-workflow-and-versioning", "ci-cd-and-automation", "shipping-and-launch",
-    "debugging-and-error-recovery", "context-engineering",
+    "debugging-and-error-recovery", "context-engineering", "self-evolution",
 )
 
 UPSTREAM_SOURCES: dict[str, dict[str, str]] = {
@@ -104,40 +104,40 @@ UPSTREAM_SOURCES: dict[str, dict[str, str]] = {
 EMPLOYEE_SKILL_MATRIX: dict[str, tuple[str, ...]] = {
     "CEO-001": (
         "makecrew", "task-intake", "interview-me", "planning-and-task-breakdown",
-        "context-engineering", "verification-before-completion",
+        "context-engineering", "verification-before-completion", "self-evolution",
     ),
     "PM-001": (
         "makecrew", "task-intake", "planning-and-task-breakdown", "parallel-dispatch",
-        "context-engineering", "verification-before-completion",
+        "context-engineering", "verification-before-completion", "self-evolution",
     ),
     "QA-001": (
         "makecrew", "task-intake", "verification-before-completion", "test-driven-development",
-        "debugging-and-error-recovery", "context-engineering",
+        "debugging-and-error-recovery", "context-engineering", "self-evolution",
     ),
     "ENG-001": (
         "task-intake", "test-driven-development", "debugging-and-error-recovery",
         "frontend-ui-engineering", "api-and-interface-design", "git-workflow-and-versioning",
-        "ci-cd-and-automation", "shipping-and-launch", "context-engineering",
+        "ci-cd-and-automation", "shipping-and-launch", "context-engineering", "self-evolution",
     ),
     "RES-001": (
         "task-intake", "source-driven-development", "context-engineering",
-        "verification-before-completion",
+        "verification-before-completion", "self-evolution",
     ),
     "CON-001": (
         "task-intake", "interview-me", "source-driven-development",
-        "verification-before-completion", "context-engineering",
+        "verification-before-completion", "context-engineering", "self-evolution",
     ),
     "DES-001": (
         "task-intake", "frontend-ui-engineering", "verification-before-completion",
-        "context-engineering",
+        "context-engineering", "self-evolution",
     ),
     "KNO-001": (
         "task-intake", "source-driven-development", "context-engineering",
-        "verification-before-completion",
+        "verification-before-completion", "self-evolution",
     ),
     "SKL-001": (
         "makecrew", "task-intake", "interview-me", "context-engineering",
-        "verification-before-completion",
+        "verification-before-completion", "self-evolution",
     ),
 }
 

@@ -159,6 +159,17 @@ class TaskLedgerTests(unittest.TestCase):
 
 
 class LearningEngineTests(unittest.TestCase):
+    def test_propose_is_idempotent_for_the_same_evidence(self):
+        engine = LearningEngine()
+        engine.record("T-1", employee_id="ENG-001", score=2, feedback="缺少测试", root_cause="验收遗漏")
+
+        first = engine.propose()
+        second = engine.propose()
+
+        self.assertEqual(len(first), 1)
+        self.assertEqual(len(second), 0)
+        self.assertEqual(len(engine.proposals), 1)
+
     def test_failed_evaluations_create_reviewable_proposal(self):
         engine = LearningEngine()
         engine.record("T-1", employee_id="ENG-001", score=2, feedback="上线前缺少浏览器验证", root_cause="验收步骤遗漏")
@@ -292,6 +303,8 @@ class IntakePlannerTests(unittest.TestCase):
         self.assertGreaterEqual(len(result["method_recommendations"]), 1)
         self.assertTrue(result["method_recommendations"][0]["skill_ids"])
         self.assertFalse(result["execute"])
+        self.assertEqual(result["learning_loop"]["stage"], "after_verification")
+        self.assertIn("replay_representative_tasks", result["learning_loop"]["steps"])
 
     def test_method_searcher_is_optional_and_runs_only_after_clarity(self):
         calls = []

@@ -94,6 +94,12 @@ def plan_request(
             "生产发布确认": "请确认目标环境、域名/账号、发布版本、发布时间和回滚方案。"
         } if public_action else {},
         "acceptance_gates": plan["acceptance_gates"],
+        "learning_loop": {
+            "stage": "after_verification",
+            "steps": ["record_score_feedback_root_cause", "propose_small_change", "replay_representative_tasks", "approve_only_if_score_improves"],
+            "automatic_mutation": False,
+            "storage": ".makecrew/learning.json (optional)",
+        },
         "requires_confirmation": requires_confirmation,
         "execute": status == "ready_to_execute",
         "execution_route": "current_conversation_panel",

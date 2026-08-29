@@ -86,14 +86,22 @@ class LearningEngine:
             if item.score < 4 and item.root_cause:
                 grouped.setdefault(item.employee_id, []).append(item)
         proposals: list[LearningProposal] = []
+        existing = {
+            (proposal.target, tuple(sorted(proposal.evidence_task_ids)))
+            for proposal in self.proposals
+            if proposal.scope == "employee"
+        }
         for index, (employee_id, records) in enumerate(grouped.items(), start=1):
             root_causes = "、".join(dict.fromkeys(item.root_cause for item in records))
+            evidence_task_ids = [item.task_id for item in records]
+            if (employee_id, tuple(sorted(evidence_task_ids))) in existing:
+                continue
             proposal = LearningProposal(
                 proposal_id=f"LP-{len(self.proposals) + index:04d}",
                 scope="employee",
                 target=employee_id,
                 change=f"为该员工增加针对“{root_causes}”的前置检查和验收步骤",
-                evidence_task_ids=[item.task_id for item in records],
+                evidence_task_ids=evidence_task_ids,
             )
             proposals.append(proposal)
         self.proposals.extend(proposals)

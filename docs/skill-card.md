@@ -32,6 +32,8 @@ conversation. Use CEO fan-out only for explicit multi-task concurrency.
    upstream references.
 10. Single-task intake that clarifies vague requests, discovers methods and
    Skills, asks for a choice, and executes in the same conversation.
+11. Evidence-based self-evolution after verification: feedback, root-cause
+   proposals, replay comparison, and reviewable adoption.
 
 ## Employee sizing
 

@@ -63,7 +63,7 @@ Token cost, parallel speed, dependency control, and rework risk explicit.
 Every new conversation follows:
 
 ```text
-rough idea -> up to three questions -> method/skill discovery -> options and trade-offs -> user confirmation -> execute -> verify
+rough idea -> up to three questions -> method/skill discovery -> options and trade-offs -> user confirmation -> execute -> verify -> record learning
 ```
 
 Discovery can use the local curated catalog or a host-provided search adapter
@@ -71,6 +71,11 @@ for fresh official documentation and open-source methods. Results are
 recommendations only: they do not silently install skills, expand scope, or
 trigger public actions. This keeps one-task work efficient while retaining CEO
 fan-out for explicit multi-task requests.
+
+After verification, the learning loop records score, feedback, and root cause.
+Repeated failures produce a reviewable proposal; representative replay must beat
+the baseline before approval. Approval is versioned and reviewable, not a silent
+rewrite of an employee skill or route.
 
 ## Core flow
 
