@@ -128,6 +128,11 @@ python -m ai_company_os.cli "开发网站并准备上线，同时研究用户并
 python -m ai_company_os.bootstrap_cli dispatch "修复登录页面的表单校验" --path ./my-ai-workspace --project demo-site
 python -m ai_company_os.bootstrap_cli intake "修复登录页面的表单校验并补测试"
 python -m ai_company_os.bootstrap_cli batch-plan "整理竞品资料" "写宣传文案" "修复登录页"
+# 并发派发：最多 2 个同时运行；T3 等 T1/T2 完成后再进入队列
+python -m ai_company_os.bootstrap_cli batch-dispatch \
+  --project demo-site --max-concurrency 2 --total-tool-calls 12 \
+  --depends-on T3=T1,T2 \
+  T1::研究用户 T2::修复登录页 T3::准备发布说明
 python -m ai_company_os.web
 ```
 
@@ -144,12 +149,35 @@ python -m ai_company_os.web
 - `ai_company_os.orchestrator.CrewOrchestrator`：读取员工注册表，优先派给现有员工；缺少岗位时创建临时员工，并返回独立验收任务
 - `ai_company_os.intake.plan_request()`：单任务需求澄清、Skill/工具规划和执行确认
 - `ai_company_os.intake.plan_batch()`：多任务 CEO 批量调度方案
+- `ai_company_os.batch.BatchScheduler`：依赖图、并发上限、批次/单任务工具预算、暂停恢复、取消、失败记录和员工线程复用
 
 ### 当前能力边界
 
 MVP 负责把自然语言任务转换成可检查的协作计划，并通过 `CrewOrchestrator` 把任务交给宿主平台提供的员工执行器。它不绑定模型、不上传任务文本；没有配置执行器时会明确返回 `queued`，不会把计划冒充成交付。按 `docs/platform-adapters.md` 接入自己的工具层即可连接真实员工对话。
 
 后续版本可以在这个稳定核心上增加模型适配器、员工状态同步和真实的并行执行器。员工数量、岗位名称和平台工具由使用者按实际工作扩展。
+
+### 多线程批次调度
+
+只有用户明确一次提交多个任务时才建立批次。`BatchScheduler` 是平台无关的队列内核：
+
+- `depends_on` 形成显式依赖图，依赖未完成的任务不会启动；
+- `max_concurrency` 限制同时运行数，可用 `set_max_concurrency()` 动态调整；
+- `total_tool_calls` 和每项 `budget` 控制批次总成本，超出后进入 `waiting_budget`；
+- `pause()`、`resume()`、`cancel()` 和 `mark_failed()` 保留原因、用量和线程身份；
+- 以 `(employee_id, project)` 缓存线程，长期项目的同一员工优先复用原对话。
+
+调度器只做状态和派发决策，不冒充实际执行。接入宿主平台时提供线程适配器：
+
+```python
+def open_thread(employee_id, project, role):
+    return {"thread_id": "HOST_THREAD_ID", "reused": False}
+
+scheduler = BatchScheduler(thread_adapter=open_thread)
+```
+
+CLI 的 `batch-dispatch` 会输出本批次的 `dispatches` 和
+`execution: host_adapter_required`；真实 Agent 创建、消息发送和结果回写由适配器负责。
 
 ## 路由规则
 

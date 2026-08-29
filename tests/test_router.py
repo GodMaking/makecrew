@@ -15,6 +15,7 @@ from ai_company_os.web import Handler
 from http.server import ThreadingHTTPServer
 from ai_company_os.orchestrator import CrewOrchestrator
 from ai_company_os.intake import plan_batch, plan_request
+from ai_company_os.batch import BatchScheduler
 
 
 class RouteTaskTests(unittest.TestCase):
@@ -321,6 +322,112 @@ class IntakePlannerTests(unittest.TestCase):
         self.assertFalse(result["execute"])
         self.assertTrue(result["requires_confirmation"])
 
+
+class BatchSchedulerTests(unittest.TestCase):
+    def test_can_adjust_concurrency_and_pause_resume_a_task(self):
+        scheduler = BatchScheduler(max_concurrency=2)
+        scheduler.add("开发网站", task_id="T1")
+        scheduler.add("写宣传文案", task_id="T2")
+        scheduler.mark_running("T1")
+
+        scheduler.set_max_concurrency(1)
+        self.assertEqual(scheduler.ready(), [])
+        scheduler.pause("T1", reason="用户暂缓开发")
+        self.assertEqual(scheduler.snapshot("T1")["status"], "paused")
+        scheduler.resume("T1")
+        self.assertEqual(scheduler.snapshot("T1")["status"], "pending")
+
+    def test_failed_task_records_reason_and_is_terminal(self):
+        scheduler = BatchScheduler()
+        scheduler.add("研究竞品", task_id="T1")
+        scheduler.mark_running("T1")
+
+        result = scheduler.mark_failed("T1", reason="来源接口超时")
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["failure_reason"], "来源接口超时")
+        self.assertEqual(scheduler.ready(), [])
+
+    def test_failed_dependency_blocks_downstream_task_with_reason(self):
+        scheduler = BatchScheduler()
+        scheduler.add("研究竞品", task_id="T1")
+        scheduler.add("写结论", task_id="T2", depends_on=["T1"])
+        scheduler.mark_running("T1")
+        scheduler.mark_failed("T1", reason="来源不可用")
+
+        self.assertEqual(scheduler.ready(), [])
+        downstream = scheduler.snapshot("T2")
+        self.assertEqual(downstream["status"], "blocked_dependency")
+        self.assertIn("T1", downstream["failure_reason"])
+
+    def test_dependencies_and_concurrency_limit_ready_work(self):
+        scheduler = BatchScheduler(max_concurrency=2)
+        scheduler.add("研究用户", task_id="T1")
+        scheduler.add("开发网站", task_id="T2")
+        scheduler.add("发布网站", task_id="T3", depends_on=["T1", "T2"])
+
+        first = scheduler.ready()
+        self.assertEqual([item["task_id"] for item in first], ["T1", "T2"])
+        self.assertNotIn("T3", [item["task_id"] for item in first])
+        scheduler.mark_running("T1")
+        scheduler.mark_running("T2")
+        self.assertEqual(scheduler.ready(), [])
+
+        scheduler.mark_done("T1")
+        scheduler.mark_done("T2")
+        self.assertEqual([item["task_id"] for item in scheduler.ready()], ["T3"])
+
+    def test_reuses_employee_thread_before_creating_one(self):
+        calls = []
+
+        def open_thread(employee_id, project, role):
+            calls.append((employee_id, project, role))
+            return {"thread_id": "thread-eng-demo", "reused": True}
+
+        scheduler = BatchScheduler(thread_adapter=open_thread)
+        scheduler.add("修复登录页面", task_id="T1", project="demo")
+        dispatched = scheduler.dispatch_ready()
+
+        self.assertEqual(dispatched[0]["thread_id"], "thread-eng-demo")
+        self.assertTrue(dispatched[0]["thread_reused"])
+        self.assertEqual(calls[0][0], "ENG-001")
+
+    def test_reuses_same_project_employee_thread_for_follow_up(self):
+        opened = []
+
+        def open_thread(employee_id, project, role):
+            opened.append((employee_id, project, role))
+            return {"thread_id": f"thread-{employee_id}-{project}", "reused": len(opened) > 1}
+
+        scheduler = BatchScheduler(thread_adapter=open_thread)
+        scheduler.add("修复登录页面", task_id="T1", project="demo")
+        scheduler.dispatch_ready()
+        scheduler.mark_done("T1")
+        scheduler.add("补登录测试", task_id="T2", project="demo")
+        result = scheduler.dispatch_ready()
+
+        self.assertEqual(result[0]["thread_id"], "thread-ENG-001-demo")
+        self.assertTrue(result[0]["thread_reused"])
+
+    def test_global_budget_pauses_later_tasks(self):
+        scheduler = BatchScheduler(max_concurrency=3, total_tool_calls=3)
+        scheduler.add("修复登录页面", task_id="T1", budget={"tool_calls": 2})
+        scheduler.add("整理竞品资料", task_id="T2", budget={"tool_calls": 2})
+
+        ready = scheduler.ready()
+        self.assertEqual([item["task_id"] for item in ready], ["T1"])
+        scheduler.mark_done("T1", usage={"tool_calls": 2})
+        self.assertEqual([item["task_id"] for item in scheduler.ready()], [])
+        self.assertEqual(scheduler.snapshot("T2")["status"], "waiting_budget")
+
+    def test_cancel_prevents_dispatch_and_preserves_reason(self):
+        scheduler = BatchScheduler()
+        scheduler.add("写宣传文案", task_id="T1")
+        scheduler.cancel("T1", reason="用户改了方向")
+
+        self.assertEqual(scheduler.ready(), [])
+        self.assertEqual(scheduler.snapshot("T1")["status"], "cancelled")
+        self.assertEqual(scheduler.snapshot("T1")["cancel_reason"], "用户改了方向")
 
 if __name__ == "__main__":
     unittest.main()

@@ -25,6 +25,9 @@ conversation. Use CEO fan-out only for explicit multi-task concurrency.
 5. Acceptance gates for code, research, content, design, knowledge-base, and public actions.
 6. Resumable task ledger with status, blockers, usage, budget, and JSON persistence.
 7. Evidence-based self-evolution proposals with baseline/candidate replay scoring.
+8. Explicit multi-task batches with dependency-aware scheduling, concurrency and
+   tool-call budgets, pause/resume/cancel controls, failure reasons, and project
+   employee-thread reuse.
 
 ## Employee sizing
 

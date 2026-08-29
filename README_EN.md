@@ -64,6 +64,28 @@ For platforms that support skills, use [`skills/makecrew/SKILL.md`](skills/makec
 
 For a complete walkthrough, see `examples/first-task/README.md`. Contributions and security boundaries are documented in `CONTRIBUTING.md` and `SECURITY.md`.
 
+### Concurrent batches
+
+Use `BatchScheduler` only when the user explicitly submits multiple tasks. It
+keeps dependencies explicit, caps concurrent work, and preserves a compact
+state snapshot for the host runtime:
+
+```bash
+python -m ai_company_os.bootstrap_cli batch-dispatch \
+  --project demo-site --max-concurrency 2 --total-tool-calls 12 \
+  --depends-on T3=T1,T2 \
+  T1::Research users T2::Fix login T3::Prepare release notes
+```
+
+`depends_on` prevents downstream work from starting early. `set_max_concurrency`
+can tune the ceiling while work is running. A batch or per-task budget places
+excess work in `waiting_budget`; `pause`, `resume`, `cancel`, and `mark_failed`
+retain reasons and usage. Threads are cached by `(employee_id, project)`, so
+follow-up work reuses the same project employee conversation before a new one
+is created. Provide a `thread_adapter` to create or look up host conversations;
+the CLI reports `execution: host_adapter_required` rather than pretending to
+run an external Agent by itself.
+
 ## Runnable MVP
 
 Requires Python 3.10+. No third-party runtime dependency is needed:

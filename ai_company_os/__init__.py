@@ -6,5 +6,6 @@ from .learning import LearningEngine, ProposalStatus
 from .bootstrap import audit_tools, initialize_workspace, register_employee
 from .orchestrator import CrewOrchestrator
 from .intake import plan_request, plan_batch
+from .batch import BatchScheduler
 
-__all__ = ["route_task", "TaskLedger", "TaskStatus", "LearningEngine", "ProposalStatus", "audit_tools", "initialize_workspace", "register_employee", "CrewOrchestrator", "plan_request", "plan_batch"]
+__all__ = ["route_task", "TaskLedger", "TaskStatus", "LearningEngine", "ProposalStatus", "audit_tools", "initialize_workspace", "register_employee", "CrewOrchestrator", "plan_request", "plan_batch", "BatchScheduler"]

@@ -59,6 +59,18 @@ result = CrewOrchestrator("./my-ai-workspace", dispatcher=send_to_employee).disp
 只有你一次发来多个独立任务，或明确要求并发处理时，才使用 CEO 批量模式：
 CEO 为每项任务复用已有员工，缺岗位时自动创建对应的新对话，并行派发后统一汇报。
 
+### 多任务的并发控制
+
+批量任务先登记依赖，再派发可执行节点。示例：
+
+```bash
+makecrew batch-dispatch --project demo-site --max-concurrency 2 \
+  --total-tool-calls 12 --depends-on T3=T1,T2 \
+  T1::研究用户 T2::修复登录页 T3::准备发布说明
+```
+
+`BatchScheduler` 会复用同一项目中同一员工的线程；依赖、并发或预算不满足时任务留在等待状态。运行中可调用 `set_max_concurrency()` 调整上限，用 `pause()/resume()` 暂停和恢复，用 `cancel()` 取消，用 `mark_failed()` 记录失败原因。CLI 只生成宿主适配器的派发清单，真实对话创建和执行由平台适配器完成。
+
 ## 方式 B：一个对话模拟完整流程
 
 当平台不方便创建多个对话时，把 `roles/ceo.md`、`roles/project-manager.md` 和 `roles/worker.md` 作为三个角色段落放进同一系统提示词，并要求模型在每个任务开头输出当前路由。小任务仍走直达员工模式。

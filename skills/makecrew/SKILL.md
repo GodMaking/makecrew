@@ -30,6 +30,14 @@ roster just to make the team look complete.
 
 Route the task, assign a unique employee ID, pass the smallest useful context, record task state and usage, collect evidence, and send a delta handoff. Use `CrewOrchestrator` (or an equivalent host adapter) to dispatch the payload to the real employee conversation. If no matching profile exists, create a temporary employee; promote only when repeated work justifies it. Public or irreversible actions require user confirmation.
 
+For an explicit multi-task request, use `BatchScheduler`: register tasks in
+dependency order, call `dispatch_ready()`, and report one compact overview.
+Set `max_concurrency` and an optional `total_tool_calls`; use per-task budgets
+to keep a batch within cost. Reuse the `(employee_id, project)` thread before
+opening a conversation. `pause`, `resume`, `cancel`, and `mark_failed` preserve
+state and reasons. The scheduler is a queue/state kernel; the host adapter must
+perform actual conversation creation and tool execution.
+
 ## Learning loop
 
 Record score, feedback, and root cause with `LearningEngine`. Generate a proposal, replay it against representative tasks, and adopt it only when the candidate score improves the baseline. Keep proposals versioned and reviewable.

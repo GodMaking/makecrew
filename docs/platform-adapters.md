@@ -22,6 +22,16 @@
 
 将任务卡作为结构化输入，将路由结果作为状态机：`intake -> route -> execute -> review -> deliver -> log`。每个 Worker 接收最小上下文包，交接使用 YAML 或 JSON 差量对象。
 
+批量并发时实现线程适配器并传给 `BatchScheduler`：
+
+```python
+def open_thread(employee_id, project, role):
+    # 在宿主平台查找或创建该员工在该项目的对话
+    return {"thread_id": "HOST_THREAD_ID", "reused": False}
+```
+
+调度器负责依赖图、并发上限、预算、暂停/恢复/取消和状态汇总；适配器负责实际创建对话、发送最小任务包、接收结果并回写 `mark_done()` 或 `mark_failed()`。
+
 ## 工具与 Skill 配置原则
 
 按岗位配置能力，而不是把所有工具塞给每个员工：开发员工配置代码、测试和部署工具；研究员工配置搜索、文档和引用工具；内容员工配置文案、图像和视频工具；Skill 员工配置文件系统、搜索和 Skill 加载/验证能力。变更工具前先记录版本和回滚方法。

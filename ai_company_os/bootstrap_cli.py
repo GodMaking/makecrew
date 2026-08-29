@@ -8,6 +8,7 @@ import json
 from .bootstrap import audit_tools, initialize_workspace, register_employee
 from .orchestrator import CrewOrchestrator
 from .intake import plan_batch, plan_request
+from .batch import BatchScheduler
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -42,6 +43,20 @@ def main(argv: list[str] | None = None) -> int:
     batch = subparsers.add_parser("batch-plan", help="plan multiple tasks for CEO fan-out")
     batch.add_argument("tasks", nargs="+", help="independent task descriptions")
 
+    batch_dispatch = subparsers.add_parser("batch-dispatch", help="queue a batch with concurrency and budget controls")
+    batch_dispatch.add_argument("tasks", nargs="+", help="TASK_ID::task description")
+    batch_dispatch.add_argument("--project", default="", help="project shared by this batch")
+    batch_dispatch.add_argument("--max-concurrency", type=int, default=3, help="maximum running tasks")
+    batch_dispatch.add_argument("--total-tool-calls", type=int, default=None, help="batch tool-call budget")
+    batch_dispatch.add_argument(
+        "--depends-on", action="append", default=[], metavar="TASK_ID=DEP1,DEP2",
+        help="declare dependencies; repeat once per task (dependencies must appear earlier)",
+    )
+    batch_dispatch.add_argument(
+        "--task-budget", action="append", default=[], metavar="TASK_ID=N",
+        help="set a per-task tool-call budget; repeat as needed",
+    )
+
     args = parser.parse_args(argv)
     if args.command == "init":
         result = initialize_workspace(args.path, project=args.project)
@@ -60,10 +75,42 @@ def main(argv: list[str] | None = None) -> int:
         result = plan_request(" ".join(args.task), confirmed=args.confirmed)
     elif args.command == "batch-plan":
         result = plan_batch(args.tasks)
+    elif args.command == "batch-dispatch":
+        scheduler = BatchScheduler(max_concurrency=args.max_concurrency, total_tool_calls=args.total_tool_calls)
+        dependencies = _parse_assignments(args.depends_on, "依赖")
+        budgets = _parse_assignments(args.task_budget, "任务预算")
+        for raw in args.tasks:
+            if "::" not in raw:
+                raise SystemExit("batch-dispatch 任务格式应为 TASK_ID::任务内容")
+            task_id, task = raw.split("::", 1)
+            budget = int(budgets[task_id]) if task_id in budgets else 1
+            depends_on = [item for item in dependencies.get(task_id, "").split(",") if item]
+            scheduler.add(task, task_id=task_id, project=args.project, depends_on=depends_on, budget=budget)
+        result = scheduler.plan()
+        result["dispatches"] = scheduler.dispatch_ready()
+        result["tasks"] = scheduler.plan()["tasks"]
+        result["overview"] = scheduler.overview()
+        result["execution"] = "host_adapter_required"
     else:
         result = CrewOrchestrator(args.path).dispatch(" ".join(args.task), project=args.project)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
+
+
+def _parse_assignments(items: list[str], label: str) -> dict[str, str]:
+    """Parse repeated TASK_ID=value CLI flags without accepting ambiguous input."""
+    parsed: dict[str, str] = {}
+    for item in items:
+        if "=" not in item:
+            raise SystemExit(f"{label}格式应为 TASK_ID=值")
+        task_id, value = item.split("=", 1)
+        task_id, value = task_id.strip(), value.strip()
+        if not task_id or not value:
+            raise SystemExit(f"{label}格式应为 TASK_ID=值")
+        if task_id in parsed:
+            raise SystemExit(f"{label}重复指定任务：{task_id}")
+        parsed[task_id] = value
+    return parsed
 
 
 if __name__ == "__main__":
