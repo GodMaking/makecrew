@@ -4,10 +4,22 @@ import unittest
 from pathlib import Path
 
 from ai_company_os.rag import RetrievalScope
-from ai_company_os.rag_store import JsonRagIndex, sha256_file
+from ai_company_os.rag_store import JsonRagIndex, plan_directory, sha256_file
 
 
 class RagStoreTests(unittest.TestCase):
+    def test_plan_directory_reads_metadata_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "source"
+            root.mkdir()
+            (root / "guide.md").write_text("机密正文", encoding="utf-8")
+            (root / "video.mp4").write_bytes(b"binary")
+            report = plan_directory(root)
+            self.assertEqual(report["supported_files"], 1)
+            self.assertEqual(report["ignored_files"], 1)
+            self.assertFalse(report["content_read"])
+            self.assertFalse(report["index_written"])
+
     def test_sync_is_incremental_and_removes_deleted_sources(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "source"

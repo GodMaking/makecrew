@@ -15,6 +15,36 @@ from .rag import HybridRetriever, KnowledgeRecord, RetrievalScope
 TEXT_SUFFIXES = {".md", ".markdown", ".txt", ".rst", ".json", ".yaml", ".yml", ".csv"}
 
 
+def plan_directory(source_dir: str | Path) -> dict[str, Any]:
+    """Inspect directory metadata only; never opens or hashes file contents."""
+    root = Path(source_dir).expanduser().resolve()
+    if not root.is_dir():
+        raise NotADirectoryError(str(root))
+    supported: dict[str, int] = {}
+    ignored: dict[str, int] = {}
+    files = 0
+    bytes_total = 0
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        suffix = path.suffix.casefold() or "[no extension]"
+        bucket = supported if path.suffix.casefold() in TEXT_SUFFIXES else ignored
+        bucket[suffix] = bucket.get(suffix, 0) + 1
+        if bucket is supported:
+            files += 1
+            bytes_total += path.stat().st_size
+    return {
+        "source_dir": str(root),
+        "supported_files": files,
+        "supported_bytes": bytes_total,
+        "supported_extensions": supported,
+        "ignored_files": sum(ignored.values()),
+        "ignored_extensions": ignored,
+        "content_read": False,
+        "index_written": False,
+    }
+
+
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:

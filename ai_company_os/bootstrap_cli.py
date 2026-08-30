@@ -11,7 +11,7 @@ from .intake import plan_batch, plan_request
 from .batch import BatchScheduler
 from .capabilities import audit_employee_capabilities
 from .rag import RetrievalScope
-from .rag_store import JsonRagIndex
+from .rag_store import JsonRagIndex, plan_directory
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -29,6 +29,9 @@ def main(argv: list[str] | None = None) -> int:
 
     rag_init = subparsers.add_parser("rag-init", help="create an empty persistent RAG index")
     rag_init.add_argument("--index", required=True, help="JSON index path")
+
+    rag_plan = subparsers.add_parser("rag-plan", help="inspect a source directory without reading content")
+    rag_plan.add_argument("--source", required=True, help="directory to inspect")
 
     rag_sync = subparsers.add_parser("rag-sync", help="incrementally index text files from a directory")
     rag_sync.add_argument("--index", required=True, help="JSON index path")
@@ -104,6 +107,8 @@ def main(argv: list[str] | None = None) -> int:
         index = JsonRagIndex(args.index)
         index.save()
         result = index.audit()
+    elif args.command == "rag-plan":
+        result = plan_directory(args.source)
     elif args.command == "rag-sync":
         index = JsonRagIndex(args.index)
         result = index.sync_directory(

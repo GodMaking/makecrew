@@ -57,11 +57,14 @@ for hit in hits:
 以下命令只作用于你明确指定的路径：
 
 ```bash
+agentflow rag-plan --source E:/知识库
 agentflow rag-init --index .makecrew/rag/index.json
 agentflow rag-sync --index .makecrew/rag/index.json --source ./knowledge --scope project --project demo
 agentflow rag-query "工程 造价" --index .makecrew/rag/index.json --actor manager --project demo
 agentflow rag-audit --index .makecrew/rag/index.json
 ```
+
+先运行 `rag-plan`。它只读取目录、扩展名和文件大小，不读取正文、不计算哈希、不写入索引，适合先评估大型知识库。确认范围后，再按主题子目录多次运行 `rag-sync`；不需要把上千 GB 内容一次性载入。
 
 同步会记录文件 SHA-256；未变化文件跳过，修改文件只替换自己的分块，删除文件会移除对应分块。默认支持 Markdown、纯文本、JSON、YAML 和 CSV。不会读取视频、二进制文件或目录外内容。
 
