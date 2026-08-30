@@ -46,6 +46,34 @@ class RagStoreTests(unittest.TestCase):
             payload = json.loads(index_path.read_text(encoding="utf-8"))
             self.assertEqual(payload["version"], 1)
 
+    def test_quality_audit_reports_duplicates_conflicts_and_hash_drift(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "source"
+            root.mkdir()
+            one = root / "one.md"
+            two = root / "two.md"
+            one.write_text("# 发布流程\n\n先验收再发布。", encoding="utf-8")
+            two.write_text("# 发布流程\n\n先测试再发布。", encoding="utf-8")
+            index = JsonRagIndex(Path(directory) / "index.json")
+            index.sync_directory(root, scope="project", project_id="demo")
+            initial = index.audit_quality()
+            self.assertEqual(initial["status"], "review")
+            self.assertEqual(len(initial["conflict_groups"]), 1)
+            one.write_text("# 发布流程\n\n内容已变化但还没同步。", encoding="utf-8")
+            drift = index.audit_quality()
+            self.assertIn(str(one.resolve()), drift["stale_sources"])
+
+    def test_quality_audit_does_not_flag_clean_index(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "source"
+            root.mkdir()
+            (root / "guide.md").write_text("# 指南\n\n唯一内容。", encoding="utf-8")
+            index = JsonRagIndex(Path(directory) / "index.json")
+            index.sync_directory(root)
+            report = index.audit_quality()
+            self.assertEqual(report["status"], "pass")
+            self.assertEqual(report["issue_count"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

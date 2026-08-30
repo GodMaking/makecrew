@@ -7,6 +7,7 @@ import hashlib
 import json
 from pathlib import Path
 from typing import Any, Iterable
+from urllib.parse import urlparse
 
 from .rag import HybridRetriever, KnowledgeRecord, RetrievalScope
 
@@ -130,7 +131,12 @@ class JsonRagIndex:
             self.files[source] = {"sha256": digest, "record_ids": record_ids, "scope": scope, "project_id": project_id}
             chunks += len(record_ids)
         for source in list(self.files):
-            if source.startswith(str(root)) and source not in current_sources:
+            try:
+                Path(source).relative_to(root)
+                under_root = True
+            except ValueError:
+                under_root = False
+            if under_root and source not in current_sources:
                 for record_id in self.files[source].get("record_ids", []):
                     self.records.pop(record_id, None)
                 del self.files[source]
@@ -147,4 +153,46 @@ class JsonRagIndex:
         for record in self.records.values():
             statuses[record.status] = statuses.get(record.status, 0) + 1
             scopes[record.scope] = scopes.get(record.scope, 0) + 1
-        return {"index": str(self.path), "version": self.VERSION, "files": len(self.files), "records": len(self.records), "statuses": statuses, "scopes": scopes}
+        return {"index": str(self.path), "version": self.VERSION, "files": len(self.files), "records": len(self.records), "statuses": statuses, "scopes": scopes, "quality": self.audit_quality()}
+
+    def audit_quality(self) -> dict[str, Any]:
+        """Report quality risks without deleting or rewriting any knowledge."""
+        duplicate_groups: list[dict[str, Any]] = []
+        by_content: dict[str, list[KnowledgeRecord]] = {}
+        for record in self.records.values():
+            normalized = " ".join(record.content.casefold().split())
+            by_content.setdefault(normalized, []).append(record)
+        for normalized, records in by_content.items():
+            if len(records) > 1:
+                duplicate_groups.append({"fingerprint": hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16], "record_ids": [record.record_id for record in records], "sources": sorted({record.source for record in records})})
+
+        conflict_groups: list[dict[str, Any]] = []
+        by_title: dict[tuple[str, str, str], list[KnowledgeRecord]] = {}
+        for record in self.records.values():
+            key = (record.scope, record.project_id, (record.title or record.record_id).casefold())
+            by_title.setdefault(key, []).append(record)
+        for (scope, project_id, title), records in by_title.items():
+            sources = {record.source for record in records}
+            contents = {" ".join(record.content.casefold().split()) for record in records}
+            if len(sources) > 1 and len(contents) > 1:
+                conflict_groups.append({"scope": scope, "project_id": project_id, "title": title, "record_ids": [record.record_id for record in records], "sources": sorted(sources), "action": "人工确认主版本并标记其他记录为 superseded"})
+
+        stale_sources: list[str] = []
+        missing_sources: list[str] = []
+        orphan_record_ids: list[str] = []
+        referenced: set[str] = set()
+        for source, metadata in self.files.items():
+            referenced.update(metadata.get("record_ids", []))
+            parsed = urlparse(source)
+            # ``urlparse`` treats ``C:\\...`` as scheme ``c``; only URLs with
+            # an explicit ``://`` are remote sources in this local index.
+            if "://" in source and parsed.scheme not in {"file"}:
+                continue
+            path = Path(source)
+            if not path.exists():
+                missing_sources.append(source)
+            elif metadata.get("sha256") and sha256_file(path) != metadata["sha256"]:
+                stale_sources.append(source)
+        orphan_record_ids = sorted(set(self.records) - referenced)
+        issues = len(duplicate_groups) + len(conflict_groups) + len(stale_sources) + len(missing_sources) + len(orphan_record_ids)
+        return {"status": "review" if issues else "pass", "duplicate_groups": duplicate_groups, "conflict_groups": conflict_groups, "stale_sources": stale_sources, "missing_sources": missing_sources, "orphan_record_ids": orphan_record_ids, "issue_count": issues}
