@@ -1,11 +1,11 @@
 ---
 name: agentflow-os
-description: AgentFlow OS (formerly MakeCrew): an adaptive AI work operating system that clarifies vague requests, matches installed Skills and methods, routes work to the right Agent, preserves project memory, verifies delivery, controls cost, and learns from evidence.
+description: Compatibility entry for MakeCrew, an adaptive open-source AI work framework that clarifies vague requests, matches installed Skills and methods, routes work to the right Agent, preserves project memory, verifies delivery, controls cost, and learns from evidence.
 ---
 
-# AgentFlow OS
+# AgentFlow OS Compatibility Entry
 
-Use this Skill when a user wants AI to clarify an underspecified task, discover
+This legacy Skill ID delegates to MakeCrew. Use it when a user wants AI to clarify an underspecified task, discover
 the best available Skill or method, route work to one or more Agents, preserve
 project memory, enforce verification, resume interrupted work, or improve from
 feedback. Search aliases: `MakeCrew`, `AI Company OS`, `AI work operating
@@ -23,7 +23,7 @@ install or use one.
 ## Post-install welcome
 
 After installation or first activation, immediately tell the user in plain
-language that AgentFlow OS is ready and explain the three ways to use it:
+language that MakeCrew is ready and explain the three ways to use it:
 lightweight current-conversation mode, approved basic-team mode, and on-demand
 employee mode. Mention that existing conversations and project memory are kept,
 that a single clear task stays in the current conversation, and that missing

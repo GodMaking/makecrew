@@ -1,16 +1,16 @@
 ---
 name: makecrew
-description: Compatibility entry for AgentFlow OS (formerly MakeCrew), an adaptive AI work operating system for requirement clarification, local-first Skill discovery, Agent routing, project memory, review gates, resumable task state, and evidence-based self-evolution.
+description: MakeCrew is an adaptive open-source AI work framework for requirement clarification, local-first Skill discovery, Agent routing, project memory, review gates, resumable task state, and evidence-based self-evolution.
 ---
 
-# MakeCrew Compatibility Skill for AgentFlow OS
+# MakeCrew
 
 Use this skill when a user wants an AI work operating system to clarify vague requests, discover Skills and methods, coordinate coding/research/content/design work, preserve project context, reduce repeated conversation history, or add review and budget controls. The legacy Skill ID is `makecrew`.
 
 For a single new task, prefer the companion `task-intake` Skill. It selects the
 shortest reliable path in the current conversation: routine tasks execute
 directly, while clarification, discovery, confirmation, an expert panel, and
-learning are added only when triggered. Keep AgentFlow OS's CEO/orchestrator path
+learning are added only when triggered. Keep MakeCrew's CEO/orchestrator path
 for explicit multi-task parallel work or cross-project decisions.
 
 For every clear task, inspect and match the host's installed Skills first. Use
@@ -19,7 +19,7 @@ show their purpose and source, and wait for the user's install/use choice before
 the host changes its Skill inventory.
 
 After setup or first activation, immediately give the user a plain-language
-welcome: say AgentFlow OS is ready, explain lightweight current-conversation,
+welcome: say MakeCrew is ready, explain lightweight current-conversation,
 approved basic-team, and on-demand employee modes, and state that existing
 conversations and project memory remain intact. Show this once per workspace;
 do not send recurring daily notices.

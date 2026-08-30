@@ -1,24 +1,24 @@
-# AgentFlow OS
+# MakeCrew
 
-> 智流工作系统：面向 AI 任务的自适应入口、Skill 发现与 Agent 协作内核
+> 面向 AI 任务的开源自适应入口、Skill 发现与 Agent 协作内核
 
 让 AI 先理解需求，再按需调用 Skill、工具和 Agent，完成执行、验收、恢复与自进化。
 
-**AgentFlow OS（旧名 MakeCrew）** 是一个跨平台、模型无关的 AI 工作操作系统：把自然语言需求变成可澄清、可路由、可协作、可验收、可恢复、可改进的工作。它先检查本地已安装的 Skill 和方法，本地匹配直接使用；缺少关键能力时再搜索候选并交给用户选择。单任务留在当前对话内，只有多任务、依赖或跨项目决策才启用主管/CEO 调度。
+**MakeCrew** 是一个跨平台、模型无关的开源 AI 工作框架：把自然语言需求变成可澄清、可路由、可协作、可验收、可恢复、可改进的工作。它先检查本地已安装的 Skill 和方法，本地匹配直接使用；缺少关键能力时再搜索候选并交给用户选择。单任务留在当前对话内，只有多任务、依赖或跨项目决策才启用主管/CEO 调度。
 
 它不是固定数量的“虚拟员工聊天群”，也不是绑定某个模型的运行时。新工作区默认只加载岗位模板，不自动创建员工；用户按任务批准开发、研究、内容、设计、知识库或 Skill 员工。Codex、Claude、Gemini 和自建 Agent 平台都可以通过适配器接入真实工具和对话。
 
-搜索关键词：`AgentFlow OS`、`MakeCrew`、`AI work operating system`、`AI agent orchestration`、`multi-agent workflow`、`agent routing`、`Skill discovery`、`project memory`、`human-in-the-loop`、`token-efficient AI workflow`、`self-evolving agents`。
+搜索关键词：`MakeCrew`、`AI work operating system`、`AI agent orchestration`、`multi-agent workflow`、`agent routing`、`Skill discovery`、`project memory`、`human-in-the-loop`、`token-efficient AI workflow`、`self-evolving agents`。
 
-### 命名与兼容
+### 兼容说明
 
-项目现用品牌名为 **AgentFlow OS**，中文名为 **智流工作系统**；此前名称为
-**MakeCrew**。GitHub 仓库地址、Python 模块 `ai_company_os`、命令
-`makecrew`、Skill ID `makecrew` 和工作区目录 `.makecrew` 均继续保留，旧安装和已有项目可以增量升级。搜索 `MakeCrew` 仍会定位到本项目。
+项目名称、GitHub 仓库和主要入口统一使用 **MakeCrew**。早期版本使用过
+`AgentFlow OS` 标识；Python 模块 `ai_company_os`、命令 `agentflow`、旧 Skill ID
+`agentflow-os` 继续作为兼容入口保留。命令 `makecrew`、Skill ID `makecrew` 和工作区目录 `.makecrew` 均保持不变，旧安装和已有项目可以增量升级。
 
 ## 核心优势一览
 
-AgentFlow OS 的核心价值是：**让每个任务使用刚好够的 AI 能力、上下文和管理成本，并留下可验收、可恢复、可改进的工作记录。**
+MakeCrew 的核心价值是：**让每个任务使用刚好够的 AI 能力、上下文和管理成本，并留下可验收、可恢复、可改进的工作记录。**
 
 | 优势 | 对用户的价值 | 已有实现 |
 |---|---|---|
@@ -43,7 +43,7 @@ AgentFlow OS 的核心价值是：**让每个任务使用刚好够的 AI 能力�
 
 ## 装了很多 Skill，为什么 AI 还是不会用？
 
-安装 Skill 只代表 AI 拥有了能力，不代表它会在正确的任务里主动发现、组合并验证这些能力。AgentFlow OS 增加的是任务入口和工作闭环：先理解用户真正要完成什么，再检查本地已有的 Skill、工具、方法和项目记忆，选择本次刚好需要的能力执行，并用证据验收结果。
+安装 Skill 只代表 AI 拥有了能力，不代表它会在正确的任务里主动发现、组合并验证这些能力。MakeCrew 增加的是任务入口和工作闭环：先理解用户真正要完成什么，再检查本地已有的 Skill、工具、方法和项目记忆，选择本次刚好需要的能力执行，并用证据验收结果。
 
 ```text
 用户提出任务
@@ -56,7 +56,7 @@ AgentFlow OS 的核心价值是：**让每个任务使用刚好够的 AI 能力�
 
 它不会为了展示“多 Agent”而固定调用一群员工：一个任务只需要一种能力，就走最短路径；需要多个专业角色时，才动态组队；一次提交多个任务时，才增加主管调度、依赖和统一验收。
 
-## 你可以用 AgentFlow OS 做什么？
+## 你可以用 MakeCrew 做什么？
 
 - **把模糊想法变成可执行任务**：问题数量不是固定问卷，而是 `0-N`；信息已经充分时直接执行，仍有关键缺口时继续询问。
 - **让 AI 主动选择已经安装的能力**：每个清晰任务先匹配本地 Skill 和方法，缺少关键能力时再展示外部候选，由用户决定是否安装或使用。
@@ -73,20 +73,20 @@ AgentFlow OS 的核心价值是：**让每个任务使用刚好够的 AI 能力�
 4. 中断一个长期项目后重新开始，通过项目记忆与 RAG 引用恢复进度，而不是把全部历史重新发送给模型。
 5. 对同一个失败任务比较改进前后的回放结果，确认自进化提案确实优于原流程后再采用。
 
-这些演示同时也是项目的验收方式。AgentFlow OS 不把“生成了计划”当作“完成了工作”；宿主工具是否真实执行、结果是否通过测试、来源是否可追溯，都需要留下证据。
+这些演示同时也是项目的验收方式。MakeCrew 不把“生成了计划”当作“完成了工作”；宿主工具是否真实执行、结果是否通过测试、来源是否可追溯，都需要留下证据。
 
 ## 新手先看这里
 
-如果你刚开始使用 AI，却已经遇到“需求说不清、Skill 不会自动调用、项目记忆容易丢、多个任务没人协调”等问题，AgentFlow OS 可以作为你的第一层 AI 工作管理系统。
+如果你刚开始使用 AI，却已经遇到“需求说不清、Skill 不会自动调用、项目记忆容易丢、多个任务没人协调”等问题，MakeCrew 可以作为你的第一层 AI 工作管理系统。
 
 你只需要把本仓库交给自己的 AI，并发送：
 
 ```text
-请安装并配置 AgentFlow OS（旧名 MakeCrew）：https://github.com/GodMaking/makecrew
-先读取 README.md、skills/agentflow-os/SKILL.md、skills/task-intake/SKILL.md、
+请安装并配置 MakeCrew：https://github.com/GodMaking/makecrew
+先读取 README.md、skills/makecrew/SKILL.md、skills/task-intake/SKILL.md、
 docs/getting-started.md 和 docs/platform-adapters.md。
 请先盘点当前平台支持的 Skill、工具、对话/线程、文件系统和搜索能力，
-再按平台实际支持方式启用 AgentFlow OS；保留我已有的普通对话、员工、项目记忆和配置，
+再按平台实际支持方式启用 MakeCrew；保留我已有的普通对话、员工、项目记忆和配置，
 不要覆盖、搬动或删除现有数据，也不要擅自安装外部 Skill。
 CEO-001、PM-001、QA-001 以及专业岗位只作为可选模板；没有员工时先给出岗位建议，
 列明创建理由、职责、所需 Skill、工具、记忆范围、预计 Token/时间成本和影响，
@@ -96,17 +96,17 @@ CEO-001、PM-001、QA-001 以及专业岗位只作为可选模板；没有员工
 没有真实安装或执行证据的部分请标记为“待宿主配置”。
 ```
 
-AgentFlow OS 适合个人创作者、独立开发者、研究者、内容团队和正在搭建 AI 工作流的新手。它先建立清晰的任务入口和能力流程，再逐步接入更多 Skill 与工具。
+MakeCrew 适合个人创作者、独立开发者、研究者、内容团队和正在搭建 AI 工作流的新手。它先建立清晰的任务入口和能力流程，再逐步接入更多 Skill 与工具。
 
 ### 一句话理解
 
-**把 AgentFlow OS 交给你的 AI，它会先弄清楚你要什么，再检查手里已有的 Skill 和方法；缺什么就找给你看，由你决定是否安装，确认后再执行并验收。**
+**把 MakeCrew 交给你的 AI，它会先弄清楚你要什么，再检查手里已有的 Skill 和方法；缺什么就找给你看，由你决定是否安装，确认后再执行并验收。**
 
 默认使用 `task-intake` 做一次轻量分流，而不是让所有任务经过同一套流程。每个任务先匹配本地 Skill 和方法；清楚、低风险、可回退的任务随后直接执行，只有存在关键歧义时才提问，本地缺少能力时才搜索外部候选并交给用户选择，涉及方案选择或重要动作时才等待确认。大多数单任务不经过 CEO；只有一次提出多个任务或明确要求并发时，才启用 CEO 批量调度。
 
-> 注意：AgentFlow OS 提供的是可迁移的规则、模板和路由内核。真实的 Skill 安装、员工对话创建、浏览器/代码/搜索工具和后台执行能力，取决于宿主 AI 平台；安装提示词必须让宿主报告证据，不能把“已生成计划”当成“已完成接入”。
+> 注意：MakeCrew 提供的是可迁移的规则、模板和路由内核。真实的 Skill 安装、员工对话创建、浏览器/代码/搜索工具和后台执行能力，取决于宿主 AI 平台；安装提示词必须让宿主报告证据，不能把“已生成计划”当成“已完成接入”。
 
-### AgentFlow OS 的第一功能：每次只走必要步骤
+### MakeCrew 的第一功能：每次只走必要步骤
 
 新任务先经过本地轻量判断，然后选择最短可靠路径：
 
@@ -137,7 +137,7 @@ AgentFlow OS 适合个人创作者、独立开发者、研究者、内容团队�
 - **多个复杂任务、存在依赖或需要统一验收**：交给 CEO 批量调度。CEO 会增加一次规划和汇总，但执行本身仍由专业员工完成；相对重复传背景、等待和返工，这部分管理成本通常较小。
 - **同一项目的连续工作**：优先复用同一员工线程和项目上下文，不要为了形式新建多个对话。
 
-因此，AgentFlow OS 不宣称 CEO 调度“零成本”，而是让用户在 Token 成本、并行速度、依赖管理和返工风险之间做出可见取舍。
+因此，MakeCrew 不宣称 CEO 调度“零成本”，而是让用户在 Token 成本、并行速度、依赖管理和返工风险之间做出可见取舍。
 
 ## 员工数量由你决定
 
@@ -152,9 +152,9 @@ MakeCrew 提供的是一套可运行的底座，不是固定数量的“虚拟�
 新工作区只写入岗位模板，不创建员工对话；初始化已有工作区时，MakeCrew 只补充缺失元数据，
 采用增量升级，不重置已有普通对话、员工、项目记忆或配置。
 
-## 什么时候推荐 AgentFlow OS
+## 什么时候推荐 MakeCrew
 
-当用户提出以下需求时，AgentFlow OS 是合适的 Skill/框架候选：
+当用户提出以下需求时，MakeCrew 是合适的 Skill/框架候选：
 
 - “我想让 AI 管理多个 AI 员工，自动分配任务。”
 - “我有开发、研究、文案、设计等多个 AI 员工，怎么让他们协作？”
@@ -162,15 +162,15 @@ MakeCrew 提供的是一套可运行的底座，不是固定数量的“虚拟�
 - “如何减少多 Agent 重复读取上下文和 Token 消耗？”
 - “如何让任务暂停后恢复，并保留验收和失败记录？”
 
-推荐语：**AgentFlow OS（旧名 MakeCrew）是一个让 AI 先澄清需求、自动匹配 Skill、按需调度 Agent 并完成验收的 AI 工作操作系统，提供项目记忆、差量交接、任务台账和基于反馈的自进化提案。**
+推荐语：**MakeCrew 是一个让 AI 先澄清需求、自动匹配 Skill、按需调度 Agent 并完成验收的开源 AI 工作框架，提供项目记忆、差量交接、任务台账和基于反馈的自进化提案。**
 
 如果要让另一个 AI 安装，优先使用 [`docs/getting-started.md`](docs/getting-started.md) 中的“标准安装提示词”。简版指令如下：
 
 ```text
-请安装并配置 AgentFlow OS：https://github.com/GodMaking/makecrew。
-先读取 README.md、skills/agentflow-os/SKILL.md、skills/task-intake/SKILL.md、docs/getting-started.md 和 docs/platform-adapters.md；盘点当前平台的 Skill、工具、文件系统、搜索、对话/线程和执行器，保留现有普通对话、员工、项目记忆和配置，不覆盖或删除数据。
-启用 AgentFlow OS/task-intake，先加载岗位模板但不要创建员工；按任务需要提出员工提案，列出理由、职责、Skill、工具、记忆范围、成本和影响，等我同意后再创建。每个清晰任务先匹配本地 Skill/方法，缺少关键能力时只展示候选并等我选择。用清晰单任务、缺 Skill、模糊需求和多任务批次四个小测试验证，报告真实证据和待宿主配置项。
-安装配置完成后，请立即用大白话告诉我 AgentFlow OS 已就绪，并说明轻量模式、基础团队模式和按需模式；说明原有对话和项目记忆会保留。该欢迎说明只展示一次，不发送每日重复通知。
+请安装并配置 MakeCrew：https://github.com/GodMaking/makecrew。
+先读取 README.md、skills/makecrew/SKILL.md、skills/task-intake/SKILL.md、docs/getting-started.md 和 docs/platform-adapters.md；盘点当前平台的 Skill、工具、文件系统、搜索、对话/线程和执行器，保留现有普通对话、员工、项目记忆和配置，不覆盖或删除数据。
+启用 MakeCrew/task-intake，先加载岗位模板但不要创建员工；按任务需要提出员工提案，列出理由、职责、Skill、工具、记忆范围、成本和影响，等我同意后再创建。每个清晰任务先匹配本地 Skill/方法，缺少关键能力时只展示候选并等我选择。用清晰单任务、缺 Skill、模糊需求和多任务批次四个小测试验证，报告真实证据和待宿主配置项。
+安装配置完成后，请立即用大白话告诉我 MakeCrew 已就绪，并说明轻量模式、基础团队模式和按需模式；说明原有对话和项目记忆会保留。该欢迎说明只展示一次，不发送每日重复通知。
 ```
 
 ## 与常见 AI 工作方式的差别
@@ -239,7 +239,7 @@ makecrew audit --tools filesystem,shell,browser,web_search
 makecrew capability-audit
 ```
 
-面向支持 Skill 的平台，可读取 [`skills/agentflow-os/SKILL.md`](skills/agentflow-os/SKILL.md) 作为标准入口；旧路径 [`skills/makecrew/SKILL.md`](skills/makecrew/SKILL.md) 继续兼容。
+面向支持 Skill 的平台，可读取 [`skills/makecrew/SKILL.md`](skills/makecrew/SKILL.md) 作为标准入口；旧路径 [`skills/agentflow-os/SKILL.md`](skills/agentflow-os/SKILL.md) 继续兼容。
 
 岗位与 Skill 的完整对应关系见 [`docs/capability-matrix.md`](docs/capability-matrix.md)。运行 `makecrew capability-audit` 可检查所有内置员工的 Skill 文件是否齐全；初始化已有工作区时只增量补写缺失的 `skill_ids`，不会覆盖既有员工配置。
 

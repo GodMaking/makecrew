@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "agentflow-os"
 version = "0.2.0"
-description = "AgentFlow OS (formerly MakeCrew): an adaptive, model-agnostic AI work operating system with requirement clarification, local-first Skill discovery, agent routing, memory, verification, recovery, and evidence-gated self-evolution"
+description = "MakeCrew: an adaptive, model-agnostic open-source AI work framework with requirement clarification, local-first Skill discovery, agent routing, memory, verification, recovery, and evidence-gated self-evolution"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}
