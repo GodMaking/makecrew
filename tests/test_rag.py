@@ -49,6 +49,18 @@ class RagTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             RetrievalScope("unknown")
 
+    def test_semantic_scorer_can_recall_lexically_missing_record_and_rerank(self):
+        def semantic(query, records):
+            return {record.record_id: (0.95 if record.record_id == "other-1" else 0.1) for record in records}
+
+        retriever = HybridRetriever(self.retriever._records.values(), semantic_scorer=semantic)
+        hits = retriever.search("完全不同的说法", RetrievalScope("manager", project_ids=("words",)))
+        self.assertEqual(hits[0].record.record_id, "other-1")
+
+    def test_semantic_weight_is_bounded(self):
+        with self.assertRaises(ValueError):
+            HybridRetriever(semantic_weight=1.1)
+
 
 if __name__ == "__main__":
     unittest.main()

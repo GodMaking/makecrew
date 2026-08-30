@@ -9,6 +9,7 @@ AgentFlow OS 的 RAG 层负责“按身份和项目取需要的知识”，不�
 - `KnowledgeRecord`：内容、来源、项目、状态、证据等级和可见角色；
 - `RetrievalScope`：调用者角色、项目范围、结果数量和字符预算；
 - `HybridRetriever`：关键词/中文双字短语匹配、标题加权、有效状态过滤和新鲜度加分；
+- `SemanticScorer`：可选的宿主语义评分回调；与关键词候选做双路合并和重排序；
 - `RetrievalHit.citation()`：返回记录 ID、标题、来源、更新时间、证据等级和作用域；
 - `Retriever` / `HostRagAdapter`：供宿主接入 BM25、向量库或远程搜索服务。
 
@@ -35,6 +36,17 @@ hits = index.search(
 for hit in hits:
     print(hit.record.content, hit.citation())
 ```
+
+宿主已有向量服务时，可以只注入语义分数，不改变权限和引用：
+
+```python
+def score(query, records):
+    return host_embeddings.rank(query, [record.content for record in records])
+
+index = HybridRetriever(records, semantic_scorer=score, semantic_weight=0.35)
+```
+
+关键词召回仍保留对路径、项目名和错误代码的优势；语义回调可以补回“说法不同但意思相近”的记录。权限过滤始终先于两路评分。
 
 ## 权限规则
 

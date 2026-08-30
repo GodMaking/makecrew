@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import math
 import re
-from typing import Iterable, Protocol
+from typing import Callable, Iterable, Protocol
 
 
 TOKEN_RE = re.compile(r"[A-Za-z0-9_]+|[\u4e00-\u9fff]+", re.UNICODE)
@@ -113,6 +113,12 @@ class Retriever(Protocol):
     def search(self, query: str, scope: RetrievalScope) -> list[RetrievalHit]: ...
 
 
+class SemanticScorer(Protocol):
+    """Optional host callback returning normalized semantic scores by record ID."""
+
+    def __call__(self, query: str, records: list[KnowledgeRecord]) -> dict[str, float]: ...
+
+
 class HybridRetriever:
     """Small deterministic baseline: lexical relevance plus freshness bonus.
 
@@ -120,8 +126,12 @@ class HybridRetriever:
     BM25/vector search without changing employee routing or memory boundaries.
     """
 
-    def __init__(self, records: Iterable[KnowledgeRecord] = ()) -> None:
+    def __init__(self, records: Iterable[KnowledgeRecord] = (), *, semantic_scorer: SemanticScorer | None = None, semantic_weight: float = 0.35) -> None:
+        if not 0 <= semantic_weight <= 1:
+            raise ValueError("semantic_weight 必须在 0 到 1 之间")
         self._records: dict[str, KnowledgeRecord] = {}
+        self.semantic_scorer = semantic_scorer
+        self.semantic_weight = semantic_weight
         self.upsert(records)
 
     def upsert(self, records: Iterable[KnowledgeRecord]) -> None:
@@ -134,14 +144,18 @@ class HybridRetriever:
 
     def search(self, query: str, scope: RetrievalScope) -> list[RetrievalHit]:
         query_terms = _terms(query)
-        if not query_terms:
-            return []
         visible = [record for record in self._records.values() if self._visible(record, scope)]
+        semantic_scores: dict[str, float] = {}
+        if self.semantic_scorer and visible:
+            semantic_scores = self.semantic_scorer(query, visible) or {}
+        if not query_terms and not any(float(score) > 0 for score in semantic_scores.values()):
+            return []
         document_frequency = {
             term: sum(term in _terms(record.title + " " + record.content + " " + " ".join(record.tags)) for record in visible)
             for term in query_terms
         }
-        hits: list[RetrievalHit] = []
+        lexical_scores: dict[str, float] = {}
+        matched_terms_by_id: dict[str, tuple[str, ...]] = {}
         for record in visible:
             record_terms = _terms(record.title + " " + record.content + " " + " ".join(record.tags))
             matched = query_terms & record_terms
@@ -151,8 +165,17 @@ class HybridRetriever:
             lexical = sum((1.0 + math.log((len(visible) + 1) / (document_frequency[term] + 1))) for term in matched)
             title_bonus = sum(0.35 for term in matched if term in _terms(record.title))
             freshness = 0.15 if record.status == "active" else 0.0
-            score = lexical + title_bonus + freshness
-            hits.append(RetrievalHit(record, round(score, 6), tuple(sorted(matched))))
+            lexical_scores[record.record_id] = lexical + title_bonus + freshness
+            matched_terms_by_id[record.record_id] = tuple(sorted(matched))
+        max_lexical = max(lexical_scores.values(), default=1.0)
+        candidate_ids = set(lexical_scores) | {record_id for record_id, score in semantic_scores.items() if float(score) > 0 and record_id in self._records}
+        hits: list[RetrievalHit] = []
+        for record_id in candidate_ids:
+            lexical_score = lexical_scores.get(record_id, 0.0)
+            normalized_lexical = lexical_score / max_lexical
+            semantic_score = min(1.0, max(0.0, float(semantic_scores.get(record_id, 0.0))))
+            score = ((1 - self.semantic_weight) * normalized_lexical) + (self.semantic_weight * semantic_score)
+            hits.append(RetrievalHit(self._records[record_id], round(score, 6), matched_terms_by_id.get(record_id, ())))
         hits.sort(key=lambda hit: (-hit.score, hit.record.record_id))
         selected: list[RetrievalHit] = []
         chars = 0
