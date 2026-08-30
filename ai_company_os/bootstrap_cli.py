@@ -38,6 +38,8 @@ def main(argv: list[str] | None = None) -> int:
     dispatch.add_argument("task", nargs="+", help="task description")
     dispatch.add_argument("--path", default=".", help="workspace directory")
     dispatch.add_argument("--project", default="", help="project name")
+    dispatch.add_argument("--approved-employee", action="append", default=[], dest="approved_employee_ids", help="approve a proposed employee ID; repeat for multiple")
+    dispatch.add_argument("--approve-all-employees", action="store_true", help="approve all employee proposals returned for this dispatch")
 
     intake = subparsers.add_parser("intake", help="clarify and plan one task")
     intake.add_argument("task", nargs="+", help="task description")
@@ -80,7 +82,7 @@ def main(argv: list[str] | None = None) -> int:
             "skills": [item.strip() for item in args.skills.split(",") if item.strip()],
             "tools": [item.strip() for item in args.tools.split(",") if item.strip()],
             "memory_scope": args.memory_scope,
-        })
+        }, approved=True)
     elif args.command == "intake":
         installed_skills = None if args.installed_skills is None else [
             item.strip() for item in args.installed_skills.split(",") if item.strip()
@@ -109,7 +111,12 @@ def main(argv: list[str] | None = None) -> int:
         result["overview"] = scheduler.overview()
         result["execution"] = "host_adapter_required"
     else:
-        result = CrewOrchestrator(args.path).dispatch(" ".join(args.task), project=args.project)
+        result = CrewOrchestrator(args.path).dispatch(
+            " ".join(args.task),
+            project=args.project,
+            approved_employee_ids=args.approved_employee_ids,
+            employee_approval=args.approve_all_employees,
+        )
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 

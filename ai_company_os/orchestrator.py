@@ -55,25 +55,71 @@ class CrewOrchestrator:
         )
         return matches[0] if matches else None
 
-    def _temporary_employee(self, task: str, registry: dict[str, dict[str, Any]], domain: str = "临时任务") -> str:
-        signature = hashlib.sha1(f"{domain}:{task.strip()}".encode("utf-8")).hexdigest()[:8].upper()
-        employee_id = f"TEMP-{signature}"
-        existing = registry.get(employee_id)
-        if existing and self._active(existing):
+    @staticmethod
+    def _proposal_id(task: str, domain: str, employee_id: str = "") -> str:
+        if employee_id:
             return employee_id
+        signature = hashlib.sha1(f"{domain}:{task.strip()}".encode("utf-8")).hexdigest()[:8].upper()
+        return f"TEMP-{signature}"
 
-        registry[employee_id] = {
-            "name": f"临时任务员工 {signature}",
-            "department": "临时任务",
-            "skills": ["任务专长（由本次任务生成）"],
-            "tools": ["filesystem"],
-            "memory_scope": "project",
-            "status": "active",
-            "kind": "temporary",
+    def _employee_proposal(
+        self, task: str, domain: str, source: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Describe a missing employee without creating a registry entry."""
+        source = source or {}
+        profile = EMPLOYEE_PROFILES.get(domain) or CORE_EMPLOYEE_PROFILES.get(source.get("employee_id", ""))
+        employee_id = self._proposal_id(task, domain, str(source.get("employee_id", "")).strip())
+        if profile:
+            name = profile.name
+            department = profile.department
+            skills = list(profile.skills)
+            tools = list(profile.tools)
+            memory_scope = profile.memory_scope
+            skill_ids = skill_ids_for_employee(profile.employee_id)
+            kind = "core" if profile.employee_id in CORE_EMPLOYEE_PROFILES else "custom"
+        else:
+            name = f"{domain or '临时任务'}员工"
+            department = domain or "临时任务"
+            skills = list(source.get("required_skills", [])) or ["根据任务补齐专长"]
+            tools = list(source.get("tools", [])) or ["filesystem"]
+            memory_scope = str(source.get("memory_scope", "project"))
+            skill_ids = list(source.get("skill_ids", []))
+            kind = "temporary"
+        objective = str(source.get("objective", f"完成任务中的{domain or '未分类'}部分"))
+        output = str(source.get("output", "结果、证据和下一步"))
+        return {
+            "employee_id": employee_id,
+            "name": name,
+            "department": department,
+            "reason": f"当前工作区没有可复用的{department}员工，而本任务需要该岗位完成：{objective}。",
+            "responsibilities": [objective, f"提交{output}"],
+            "required_skills": skills,
+            "skill_ids": skill_ids,
+            "tools": tools,
+            "memory_scope": memory_scope,
+            "estimated_cost": "仅在批准后创建并执行；新增一次岗位配置和对应任务调用，具体 Token 取决于任务轮次与工具调用。",
+            "impact": "只新增一个注册表条目和项目线程；保留已有普通对话、员工、项目记忆和配置，不覆盖或删除任何内容。",
+            "kind": kind,
+            "status": "awaiting_user_approval",
             "created_for": task.strip(),
         }
-        self._write_registry(registry)
-        return employee_id
+
+    def _activate_proposal(self, proposal: dict[str, Any], registry: dict[str, dict[str, Any]]) -> None:
+        """Materialize exactly one user-approved proposal."""
+        employee_id = proposal["employee_id"]
+        if employee_id in registry and self._active(registry[employee_id]):
+            return
+        registry[employee_id] = {
+            "name": proposal["name"],
+            "department": proposal["department"],
+            "skills": list(proposal["required_skills"]),
+            "tools": list(proposal["tools"]),
+            "memory_scope": proposal["memory_scope"],
+            "status": "active",
+            "kind": proposal["kind"],
+            "skill_ids": list(proposal["skill_ids"]),
+            "created_for": proposal["created_for"],
+        }
 
     def _execute(self, employee_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         if self.dispatcher is None:
@@ -83,11 +129,19 @@ class CrewOrchestrator:
             return {"employee_id": employee_id, **result}
         return {"employee_id": employee_id, "status": "completed", "result": result}
 
-    def dispatch(self, task: str, *, project: str = "") -> dict[str, Any]:
-        """Delegate a task and return execution plus independent QA instructions."""
+    def dispatch(
+        self,
+        task: str,
+        *,
+        project: str = "",
+        approved_employee_ids: list[str] | tuple[str, ...] | None = None,
+        employee_approval: bool = False,
+    ) -> dict[str, Any]:
+        """Delegate work, waiting for explicit approval when a role is missing."""
         plan = route_task(task, project)
         registry = self._read_registry()
         assignments: list[dict[str, Any]] = []
+        proposals: list[dict[str, Any]] = []
 
         # A CEO decision remains a management action. The project manager is
         # the execution coordinator; specialists handle any later work items.
@@ -99,9 +153,13 @@ class CrewOrchestrator:
                 "output": "任务拆解、负责人和依赖",
                 "employee_id": employee_id,
                 "skill_ids": skill_ids_for_employee(employee_id),
-                "dispatch_mode": "existing",
             }
-            assignments.append(assignment)
+            if employee_id in registry and self._active(registry[employee_id]):
+                assignments.append({**assignment, "dispatch_mode": "existing"})
+            else:
+                proposal = self._employee_proposal(task, "管理", assignment)
+                proposals.append(proposal)
+                assignments.append({**assignment, "dispatch_mode": "proposed"})
         else:
             domains = plan["domains"]
             if domains == ["待澄清"]:
@@ -109,9 +167,6 @@ class CrewOrchestrator:
             for index, domain in enumerate(domains):
                 employee_id = self._find_employee(domain, registry) if domain in EMPLOYEE_PROFILES else None
                 dispatch_mode = "existing"
-                if employee_id is None:
-                    employee_id = self._temporary_employee(task, registry, domain)
-                    dispatch_mode = "temporary"
                 source = plan["assignments"][index] if index < len(plan["assignments"]) else {
                     "role": "临时任务员工",
                     "objective": "完成任务并提交可复核结果",
@@ -119,11 +174,50 @@ class CrewOrchestrator:
                     "required_skills": [],
                     "tools": ["filesystem"],
                 }
+                if employee_id is None:
+                    proposal = self._employee_proposal(task, domain, source)
+                    proposals.append(proposal)
+                    employee_id = proposal["employee_id"]
+                    dispatch_mode = "proposed"
                 assignments.append({
                     **source,
                     "employee_id": employee_id,
                     "dispatch_mode": dispatch_mode,
                 })
+
+        approved = set(approved_employee_ids or [])
+        if employee_approval:
+            approved.update(proposal["employee_id"] for proposal in proposals)
+        pending_ids = {proposal["employee_id"] for proposal in proposals} - approved
+        if pending_ids:
+            return {
+                "task": task.strip(),
+                "project": project,
+                "route": plan["route"],
+                "lead": plan["lead"],
+                "status": "awaiting_employee_approval",
+                "ceo_action": "propose_and_wait",
+                "dispatch_mode": "proposed",
+                "executor_id": "",
+                "executor_ids": [],
+                "assignments": assignments,
+                "employee_proposals": proposals,
+                "execution": {"status": "awaiting_user_approval", "pending_employee_ids": sorted(pending_ids)},
+                "verification": plan["verification_contract"],
+                "acceptance_gates": plan["acceptance_gates"],
+                "next_action": "请逐项查看员工提案；批准后再次派发，或一次批准全部提案。",
+            }
+
+        for proposal in proposals:
+            self._activate_proposal(proposal, registry)
+            proposal["status"] = "created_after_user_approval"
+        if proposals:
+            self._write_registry(registry)
+            proposal_ids = {proposal["employee_id"] for proposal in proposals}
+            assignments = [
+                {**assignment, "dispatch_mode": "created_after_approval" if assignment["employee_id"] in proposal_ids else assignment["dispatch_mode"]}
+                for assignment in assignments
+            ]
 
         executions = []
         for assignment in assignments:
@@ -143,11 +237,13 @@ class CrewOrchestrator:
             "project": project,
             "route": plan["route"],
             "lead": plan["lead"],
+            "status": "dispatched",
             "ceo_action": "delegate",
             "dispatch_mode": mode,
             "executor_id": assignments[0]["employee_id"] if assignments else "",
             "executor_ids": [assignment["employee_id"] for assignment in assignments],
             "assignments": assignments,
+            "employee_proposals": proposals,
             "execution": executions[0] if len(executions) == 1 else {"status": "dispatched", "items": executions},
             "verification": plan["verification_contract"],
             "acceptance_gates": plan["acceptance_gates"],

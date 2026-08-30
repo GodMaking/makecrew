@@ -206,13 +206,13 @@ class BootstrapTests(unittest.TestCase):
             self.assertTrue(Path(directory, ".makecrew", "projects", "demo", "context-pack.md").exists())
             self.assertTrue(Path(directory, ".makecrew", "tasks.json").exists())
             self.assertTrue(Path(directory, ".makecrew", "learning.json").exists())
+            self.assertTrue(Path(directory, ".makecrew", "employee-templates.json").exists())
             registry = json.loads(Path(directory, ".makecrew", "employee-registry.json").read_text(encoding="utf-8"))
-            self.assertEqual(registry["CEO-001"]["kind"], "core")
-            self.assertEqual(registry["QA-001"]["kind"], "core")
-            self.assertEqual(registry["ENG-001"]["kind"], "specialist_template")
-            self.assertEqual(registry["SKL-001"]["kind"], "specialist_template")
-            self.assertIn("task-intake", registry["CEO-001"]["skill_ids"])
-            self.assertIn("test-driven-development", registry["ENG-001"]["skill_ids"])
+            self.assertEqual(registry, {})
+            templates = json.loads(Path(directory, ".makecrew", "employee-templates.json").read_text(encoding="utf-8"))
+            self.assertEqual(templates["CEO-001"]["kind"], "core")
+            self.assertIn("task-intake", templates["CEO-001"]["skill_ids"])
+            self.assertIn("test-driven-development", templates["ENG-001"]["skill_ids"])
 
     def test_audit_tools_reports_missing_capabilities(self):
         report = audit_tools(["filesystem", "shell"])
@@ -230,13 +230,22 @@ class BootstrapTests(unittest.TestCase):
                 "department": "增长",
                 "skills": ["渠道分析"],
                 "tools": ["web_search"],
-            })
+            }, approved=True)
             registry = json.loads(Path(directory, ".makecrew", "employee-registry.json").read_text(encoding="utf-8"))
 
             self.assertEqual(result["kind"], "custom")
             self.assertEqual(registry["MKT-001"]["kind"], "custom")
             with self.assertRaises(ValueError):
-                register_employee(directory, {"employee_id": "CEO-001", "name": "替换", "department": "管理"})
+                register_employee(directory, {"employee_id": "CEO-001", "name": "替换", "department": "管理"}, approved=True)
+
+    def test_register_employee_requires_explicit_approval(self):
+        with tempfile.TemporaryDirectory() as directory:
+            initialize_workspace(directory)
+            profile = {"employee_id": "MKT-001", "name": "增长员工", "department": "增长"}
+            with self.assertRaises(ValueError):
+                register_employee(directory, profile)
+            registry = json.loads(Path(directory, ".makecrew", "employee-registry.json").read_text(encoding="utf-8"))
+            self.assertNotIn("MKT-001", registry)
 
     def test_existing_registry_upgrade_keeps_custom_entries(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -244,21 +253,26 @@ class BootstrapTests(unittest.TestCase):
             path = Path(directory, ".makecrew", "employee-registry.json")
             registry = json.loads(path.read_text(encoding="utf-8"))
             registry["LEGACY-001"] = {"name": "旧项目员工", "department": "项目", "status": "active"}
-            del registry["QA-001"]
             path.write_text(json.dumps(registry, ensure_ascii=False), encoding="utf-8")
 
             initialize_workspace(directory)
             upgraded = json.loads(path.read_text(encoding="utf-8"))
             self.assertIn("LEGACY-001", upgraded)
-            self.assertEqual(upgraded["CEO-001"]["kind"], "core")
-            self.assertEqual(upgraded["QA-001"]["kind"], "core")
-            self.assertIn("skill_ids", upgraded["CEO-001"])
+            self.assertEqual(upgraded["LEGACY-001"]["name"], "旧项目员工")
+            self.assertNotIn("CEO-001", upgraded)
 
 
 class OrchestrationTests(unittest.TestCase):
     def test_dispatch_prefers_existing_specialist_and_keeps_ceo_as_delegate(self):
         with tempfile.TemporaryDirectory() as directory:
             initialize_workspace(directory, project="demo")
+            register_employee(directory, {
+                "employee_id": "ENG-001",
+                "name": "工程员工",
+                "department": "工程",
+                "skills": ["代码", "测试"],
+                "tools": ["shell", "filesystem", "browser"],
+            }, approved=True)
             calls = []
 
             def dispatcher(employee_id, payload):
@@ -276,27 +290,48 @@ class OrchestrationTests(unittest.TestCase):
             self.assertEqual(result["execution"]["status"], "completed")
             self.assertEqual(calls[0][0], "ENG-001")
 
-    def test_unknown_task_creates_temporary_employee(self):
+    def test_missing_employee_returns_proposal_without_writing_registry(self):
         with tempfile.TemporaryDirectory() as directory:
             initialize_workspace(directory)
             result = CrewOrchestrator(directory).dispatch("处理一个全新领域的特殊任务")
 
-            self.assertEqual(result["dispatch_mode"], "temporary")
-            self.assertTrue(result["executor_id"].startswith("TEMP-"))
+            self.assertEqual(result["status"], "awaiting_employee_approval")
+            self.assertEqual(result["dispatch_mode"], "proposed")
+            proposal = result["employee_proposals"][0]
+            self.assertTrue(proposal["employee_id"].startswith("TEMP-"))
+            for field in ("reason", "responsibilities", "skill_ids", "tools", "memory_scope", "estimated_cost", "impact"):
+                self.assertIn(field, proposal)
             registry = json.loads(Path(directory, ".makecrew", "employee-registry.json").read_text(encoding="utf-8"))
-            self.assertEqual(registry[result["executor_id"]]["kind"], "temporary")
+            self.assertEqual(registry, {})
+
+    def test_user_approval_creates_only_the_proposed_employee_then_dispatches(self):
+        with tempfile.TemporaryDirectory() as directory:
+            initialize_workspace(directory)
+            orchestrator = CrewOrchestrator(directory)
+            proposal_result = orchestrator.dispatch("处理一个全新领域的特殊任务")
+            employee_id = proposal_result["employee_proposals"][0]["employee_id"]
+
+            result = orchestrator.dispatch("处理一个全新领域的特殊任务", approved_employee_ids=[employee_id])
+
+            self.assertEqual(result["status"], "dispatched")
+            self.assertEqual(result["dispatch_mode"], "created_after_approval")
+            self.assertEqual(result["employee_proposals"][0]["status"], "created_after_user_approval")
+            registry = json.loads(Path(directory, ".makecrew", "employee-registry.json").read_text(encoding="utf-8"))
+            self.assertEqual(registry[employee_id]["kind"], "temporary")
 
     def test_temporary_employee_can_be_promoted_without_touching_core(self):
         with tempfile.TemporaryDirectory() as directory:
             initialize_workspace(directory)
             orchestrator = CrewOrchestrator(directory)
             result = orchestrator.dispatch("处理一个全新领域的特殊任务")
+            employee_id = result["employee_proposals"][0]["employee_id"]
+            orchestrator.dispatch("处理一个全新领域的特殊任务", approved_employee_ids=[employee_id])
 
-            promoted = orchestrator.promote(result["executor_id"])
+            promoted = orchestrator.promote(employee_id)
             registry = json.loads(Path(directory, ".makecrew", "employee-registry.json").read_text(encoding="utf-8"))
             self.assertEqual(promoted["kind"], "custom")
-            self.assertEqual(registry[result["executor_id"]]["kind"], "custom")
-            self.assertEqual(registry["CEO-001"]["kind"], "core")
+            self.assertEqual(registry[employee_id]["kind"], "custom")
+            self.assertNotIn("CEO-001", registry)
 
 
 class IntakePlannerTests(unittest.TestCase):

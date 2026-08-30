@@ -13,11 +13,11 @@
 1. 读取 README.md、skills/makecrew/SKILL.md、skills/task-intake/SKILL.md、
    docs/getting-started.md 和 docs/platform-adapters.md。
 2. 盘点当前平台支持的 Skill、工具、文件系统、搜索、对话/线程和执行器。
-3. 读取已有员工、项目记忆和配置；保留原内容，不覆盖、搬动或删除。
+3. 读取已有普通对话、员工、项目记忆和配置；保留原内容，不覆盖、搬动或删除。
 
 配置：
 1. 启用 MakeCrew 和 task-intake 作为入口 Skill（按当前平台支持的安装方式）。
-2. 从 CEO-001、PM-001、QA-001 三个核心岗位开始；专业员工按任务需要增加。
+2. CEO-001、PM-001、QA-001 和专业岗位都只是可选模板；没有员工时先提出建议，不自动创建。
 3. 为每个岗位写明 Skill、工具、记忆范围、输出契约和验收标准。
 4. 配置本地 Skill 清单：每个清晰任务先本地匹配；缺少关键 Skill 时只搜索候选，
    展示用途和来源，等我选择后再安装或使用。
@@ -28,7 +28,8 @@
 3. 模糊需求：每轮问 1-3 个关键问题，总数 0-N，直到可执行。
 4. 多任务：应生成 CEO 批次、依赖、并发和预算计划。
 
-请报告：实际启用的 Skill、员工和工具映射、四项测试结果、未接入能力、
+创建任一员工或新对话前，先列出创建理由、职责、所需 Skill、工具、记忆范围、预计成本和影响，
+等我明确同意后再创建。请报告：实际启用的 Skill、员工和工具映射、四项测试结果、未接入能力、
 权限/文件变更和回滚方法。没有真实证据的项目标记为“待宿主配置”。
 ```
 
@@ -55,8 +56,8 @@ MVP 使用本地规则生成计划，不上传任务内容。接入真实模型�
 
 ## 方式 A：多个员工对话（仅在需要时）
 
-1. 新建一个对话，粘贴 `roles/ceo.md`，命名为“CEO 总控”。
-2. 为每个长期项目新建一个对话，粘贴 `roles/project-manager.md`，并附上该项目的 `context-pack.md`。
+1. 不要为安装自动新建对话。需要跨项目统筹时，先审阅 `CEO-001` 提案；同意后再新建一个对话，粘贴 `roles/ceo.md`，命名为“CEO 总控”，或绑定你指定的已有对话。
+2. 为每个长期项目按需创建项目主管对话，粘贴 `roles/project-manager.md`，并附上该项目的 `context-pack.md`；创建前同样先展示提案并等待同意。
 3. 按需要为开发、研究、文案、设计等岗位建对话，粘贴 `roles/worker.md`，再补充岗位专属工具说明；不需要的岗位先不创建，同一岗位可按项目复制多个。
 4. 你把跨项目目标发给 CEO；明确的单项工作直接发给专业员工。
 
@@ -77,10 +78,21 @@ result = CrewOrchestrator("./my-ai-workspace", dispatcher=send_to_employee).disp
 )
 ```
 
-规则是：已有匹配员工优先；没有匹配岗位时生成 `TEMP-XXXXXXXX` 临时员工；
-同类任务稳定重复后调用 `promote(employee_id)` 升级为长期自定义员工，
-一次性任务则调用 `archive(employee_id)` 归档。CEO 只做决策和派单，
-不会因为缺少专业岗位而默默代做。
+第一次运行会返回 `status: awaiting_employee_approval` 和
+`employee_proposals`，例如提案 ID 为 `ENG-001`。把提案展示给用户并得到同意后，
+再这样派发：
+
+```python
+result = CrewOrchestrator("./my-ai-workspace", dispatcher=send_to_employee).dispatch(
+    "开发网站并准备上线", project="demo-site", approved_employee_ids=["ENG-001"]
+)
+```
+
+规则是：已有匹配员工优先；没有匹配岗位时返回 `employee_proposals`，
+提案包含理由、职责、Skill、工具、记忆范围、成本和影响，并将状态设为
+`awaiting_employee_approval`。用户批准对应 ID（或明确批准全部）后再次派发，
+系统才创建员工或新对话。同类任务稳定重复后可调用 `promote(employee_id)` 升级为长期自定义员工，
+一次性任务则调用 `archive(employee_id)` 归档。CEO 只做决策和派单，不会因为缺少专业岗位而默默代做。
 
 ## 默认单任务入口
 
@@ -97,7 +109,7 @@ result = CrewOrchestrator("./my-ai-workspace", dispatcher=send_to_employee).disp
 这条路径不经过 CEO，不创建额外员工对话，也不复制完整历史。
 
 只有你一次发来多个独立任务，或明确要求并发处理时，才使用 CEO 批量模式：
-CEO 为每项任务复用已有员工，缺岗位时自动创建对应的新对话，并行派发后统一汇报。
+CEO 为每项任务复用已有员工；缺岗位时先汇总员工提案并等待一次批准，批准后再并行派发。
 
 ### 多任务的并发控制
 

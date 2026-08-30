@@ -19,6 +19,27 @@ KNOWN_TOOLS = (
 )
 
 
+def _default_profiles() -> dict[str, dict]:
+    """Return immutable-by-convention role templates for user review.
+
+    Templates describe available roles; they are not employee instances and
+    therefore must not create host conversations or active registry entries.
+    """
+    return {
+        profile.employee_id: {
+            "name": profile.name,
+            "department": profile.department,
+            "skills": list(profile.skills),
+            "tools": list(profile.tools),
+            "memory_scope": profile.memory_scope,
+            "status": profile.status,
+            "kind": profile.kind,
+            "skill_ids": skill_ids_for_employee(profile.employee_id),
+        }
+        for profile in [*CORE_EMPLOYEE_PROFILES.values(), *EMPLOYEE_PROFILES.values()]
+    }
+
+
 def audit_tools(available: list[str] | tuple[str, ...] | set[str]) -> dict[str, list[str]]:
     """Compare host tools with the capabilities used by the default profiles."""
     available_set = {item.strip() for item in available if item and item.strip()}
@@ -55,50 +76,50 @@ def initialize_workspace(base_dir: str | Path, *, project: str = "main") -> dict
             path.write_text(content, encoding="utf-8")
             created.append(str(path.relative_to(root)))
 
-    default_registry = {
-        profile.employee_id: {
-            "name": profile.name,
-            "department": profile.department,
-            "skills": list(profile.skills),
-            "tools": list(profile.tools),
-            "memory_scope": profile.memory_scope,
-            "status": profile.status,
-            "kind": profile.kind,
-            "skill_ids": skill_ids_for_employee(profile.employee_id),
-        }
-        for profile in [*CORE_EMPLOYEE_PROFILES.values(), *EMPLOYEE_PROFILES.values()]
-    }
+    default_templates = _default_profiles()
+    templates_path = crew_dir / "employee-templates.json"
+    if not templates_path.exists():
+        templates_path.write_text(json.dumps(default_templates, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        created.append(str(templates_path.relative_to(root)))
     registry_path = crew_dir / "employee-registry.json"
     if not registry_path.exists():
-        registry_path.write_text(json.dumps(default_registry, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        # A fresh install has no employees yet. Templates are opt-in and only
+        # become employees after the user reviews and approves a proposal.
+        registry_path.write_text("{}\n", encoding="utf-8")
         created.append(str(registry_path.relative_to(root)))
     else:
-        # Upgrade an existing workspace additively. User-defined entries and
-        # their settings take precedence over the built-in defaults.
+        # Upgrade an existing workspace additively. Existing employees,
+        # ordinary conversations, project memory, and user settings win.
         registry = json.loads(registry_path.read_text(encoding="utf-8"))
         changed = False
-        for employee_id, profile in default_registry.items():
-            if employee_id not in registry:
-                registry[employee_id] = profile
+        # Only enrich entries that already exist; never create a role silently.
+        for employee_id, record in registry.items():
+            template = default_templates.get(employee_id, {})
+            if "kind" not in record and template.get("kind"):
+                record["kind"] = template["kind"]
                 changed = True
-            elif "kind" not in registry[employee_id]:
-                registry[employee_id]["kind"] = profile["kind"]
-                changed = True
-            if "skill_ids" not in registry[employee_id]:
-                registry[employee_id]["skill_ids"] = profile["skill_ids"]
+            if "skill_ids" not in record and template.get("skill_ids"):
+                record["skill_ids"] = template["skill_ids"]
                 changed = True
         if changed:
             registry_path.write_text(json.dumps(registry, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return {"root": str(root), "project": project_name, "created_count": str(len(created))}
+    return {"root": str(root), "project": project_name, "created_count": str(len(created)), "employee_count": str(len(json.loads(registry_path.read_text(encoding="utf-8"))))}
 
 
-def register_employee(base_dir: str | Path, profile: EmployeeProfile | dict) -> dict[str, str]:
+def register_employee(
+    base_dir: str | Path,
+    profile: EmployeeProfile | dict,
+    *,
+    approved: bool = False,
+) -> dict[str, str]:
     """Add one user-selected employee without replacing core roles or templates.
 
     The registry is intentionally additive. Existing project memory and role
     definitions remain untouched, while a custom employee gets the same
     capability contract as the built-in profiles.
     """
+    if not approved:
+        raise ValueError("创建员工前必须先展示提案并取得用户同意；请传入 approved=True")
     root = Path(base_dir).expanduser().resolve()
     registry_path = root / ".makecrew" / "employee-registry.json"
     if not registry_path.exists():

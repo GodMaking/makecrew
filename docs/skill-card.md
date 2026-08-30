@@ -24,22 +24,23 @@ CEO fan-out only for explicit multi-task concurrency.
 1. Dynamic task routing to specialist, project lead, or CEO.
 2. Three-role core loop (`CEO-001`, `PM-001`, `QA-001`) with optional specialist templates.
 3. Capability contracts for employee ID, skills, tools, status, kind, and memory scope.
-4. Project context packs and delta-only handoffs.
-5. Acceptance gates for code, research, content, design, knowledge-base, and public actions.
-6. Resumable task ledger with status, blockers, usage, budget, and JSON persistence.
-7. Evidence-based self-evolution proposals with baseline/candidate replay scoring.
-8. Explicit multi-task batches with dependency-aware scheduling, concurrency and
+4. Human approval before creating any employee or new employee conversation: every proposal explains reason, responsibilities, Skills, tools, memory scope, estimated cost, and impact.
+5. Project context packs and delta-only handoffs.
+6. Acceptance gates for code, research, content, design, knowledge-base, and public actions.
+7. Resumable task ledger with status, blockers, usage, budget, and JSON persistence.
+8. Evidence-based self-evolution proposals with baseline/candidate replay scoring.
+9. Explicit multi-task batches with dependency-aware scheduling, concurrency and
    tool-call budgets, pause/resume/cancel controls, failure reasons, and project
    employee-thread reuse.
-9. Auditable employee-to-skill matrix with portable local adapters and traced
+10. Auditable employee-to-skill matrix with portable local adapters and traced
    upstream references.
-10. Single-task intake that clarifies vague requests, discovers methods and
+11. Single-task intake that clarifies vague requests, discovers methods and
    Skills, asks for a choice when a local capability is missing, and executes in
    the same conversation.
-11. Local-first Skill and method matching: inspect installed Skill metadata for
+12. Local-first Skill and method matching: inspect installed Skill metadata for
    every clear task, load matched instructions progressively, and search external
    candidates only for unresolved gaps or fresh method comparisons.
-12. Evidence-based self-evolution after verification: feedback, root-cause
+13. Evidence-based self-evolution after verification: feedback, root-cause
    proposals, replay comparison, and reviewable adoption.
 
 ## Employee sizing
@@ -60,7 +61,8 @@ An AI assistant receiving this repository should start with the standard
 installation prompt in `docs/getting-started.md`, then read the repository
 guides, inspect `roles/`, `templates/`, and `docs/platform-adapters.md`, and
 configure only the roles and tools supported by the user's platform. It should
-preserve existing project memory, report host limitations, and run the four
+preserve existing ordinary conversations, employees, project memory, and configuration;
+load role templates without creating employees, report host limitations, and run the four
 small acceptance tests before enabling higher-cost execution.
 
 Run `makecrew capability-audit` after setup. It checks every built-in employee's
