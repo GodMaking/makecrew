@@ -15,6 +15,7 @@ from typing import Any, Callable
 from .bootstrap import initialize_workspace
 from .router import CORE_EMPLOYEE_PROFILES, EMPLOYEE_PROFILES, route_task
 from .capabilities import skill_ids_for_employee
+from .rag_identity import scope_payload, scope_for_employee
 
 
 Dispatcher = Callable[[str, dict[str, Any]], dict[str, Any]]
@@ -221,10 +222,16 @@ class CrewOrchestrator:
 
         executions = []
         for assignment in assignments:
+            rag_scope = scope_for_employee(
+                assignment["employee_id"],
+                project_ids=(project,) if project else (),
+                memory_scope=assignment.get("memory_scope", "project"),
+            )
             payload = {
                 "task": task.strip(),
                 "project": project,
                 "assignment": assignment,
+                "rag_scope": scope_payload(rag_scope),
                 "acceptance_gates": plan["acceptance_gates"],
                 "instruction": "只执行分配范围，完成后回传结果、证据、风险和下一步。",
             }

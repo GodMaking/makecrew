@@ -290,6 +290,8 @@ class OrchestrationTests(unittest.TestCase):
             self.assertEqual(result["verification"]["employee_id"], "QA-001")
             self.assertEqual(result["execution"]["status"], "completed")
             self.assertEqual(calls[0][0], "ENG-001")
+            self.assertEqual(calls[0][1]["rag_scope"]["project_ids"], ["demo"])
+            self.assertFalse(calls[0][1]["rag_scope"]["include_company"])
 
     def test_missing_employee_returns_proposal_without_writing_registry(self):
         with tempfile.TemporaryDirectory() as directory:
