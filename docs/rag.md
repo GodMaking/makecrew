@@ -54,8 +54,21 @@ for hit in hits:
 
 ## 后续切片
 
-1. 文件增量索引与内容哈希，避免重复切片；
-2. BM25/向量双路召回与重排序；
-3. 过期、冲突和废止记录审计；
-4. `rag-init`、`rag-sync`、`rag-query` 和 `rag-audit` CLI；
-5. 与项目主管、专业员工身份配置绑定的宿主适配器。
+## 本地 CLI
+
+以下命令只作用于你明确指定的路径：
+
+```bash
+agentflow rag-init --index .makecrew/rag/index.json
+agentflow rag-sync --index .makecrew/rag/index.json --source ./knowledge --scope project --project demo
+agentflow rag-query "工程 造价" --index .makecrew/rag/index.json --actor manager --project demo
+agentflow rag-audit --index .makecrew/rag/index.json
+```
+
+同步会记录文件 SHA-256；未变化文件跳过，修改文件只替换自己的分块，删除文件会移除对应分块。默认支持 Markdown、纯文本、JSON、YAML 和 CSV。不会读取视频、二进制文件或目录外内容。
+
+## 后续切片
+
+1. BM25/向量双路召回与重排序；
+2. 过期、冲突和废止记录审计；
+3. 与项目主管、专业员工身份配置绑定的宿主适配器。

@@ -10,6 +10,8 @@ from .orchestrator import CrewOrchestrator
 from .intake import plan_batch, plan_request
 from .batch import BatchScheduler
 from .capabilities import audit_employee_capabilities
+from .rag import RetrievalScope
+from .rag_store import JsonRagIndex
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -24,6 +26,30 @@ def main(argv: list[str] | None = None) -> int:
     audit.add_argument("--tools", default="", help="comma-separated available tool names")
 
     capability_audit = subparsers.add_parser("capability-audit", help="audit built-in employee skill bindings")
+
+    rag_init = subparsers.add_parser("rag-init", help="create an empty persistent RAG index")
+    rag_init.add_argument("--index", required=True, help="JSON index path")
+
+    rag_sync = subparsers.add_parser("rag-sync", help="incrementally index text files from a directory")
+    rag_sync.add_argument("--index", required=True, help="JSON index path")
+    rag_sync.add_argument("--source", required=True, help="directory to index; only this directory is read")
+    rag_sync.add_argument("--scope", choices=["company", "project", "task"], default="company")
+    rag_sync.add_argument("--project", default="", help="project ID for project/task scope")
+    rag_sync.add_argument("--actors", default="ceo,manager,employee,task", help="comma-separated allowed actors")
+    rag_sync.add_argument("--chunk-chars", type=int, default=1200)
+
+    rag_query = subparsers.add_parser("rag-query", help="query a persistent RAG index")
+    rag_query.add_argument("query", nargs="+", help="search query")
+    rag_query.add_argument("--index", required=True, help="JSON index path")
+    rag_query.add_argument("--actor", choices=["ceo", "manager", "employee", "task"], required=True)
+    rag_query.add_argument("--project", action="append", default=[], dest="project_ids")
+    rag_query.add_argument("--include-inactive", action="store_true")
+    rag_query.add_argument("--include-archived", action="store_true")
+    rag_query.add_argument("--max-results", type=int, default=8)
+    rag_query.add_argument("--max-chars", type=int, default=20000)
+
+    rag_audit = subparsers.add_parser("rag-audit", help="audit a persistent RAG index")
+    rag_audit.add_argument("--index", required=True, help="JSON index path")
 
     add = subparsers.add_parser("add-employee", help="add a user-defined employee")
     add.add_argument("--path", default=".", help="workspace directory")
@@ -74,6 +100,36 @@ def main(argv: list[str] | None = None) -> int:
         result = audit_tools([item for item in args.tools.split(",") if item.strip()])
     elif args.command == "capability-audit":
         result = audit_employee_capabilities()
+    elif args.command == "rag-init":
+        index = JsonRagIndex(args.index)
+        index.save()
+        result = index.audit()
+    elif args.command == "rag-sync":
+        index = JsonRagIndex(args.index)
+        result = index.sync_directory(
+            args.source,
+            scope=args.scope,
+            project_id=args.project,
+            allowed_actors=[item.strip() for item in args.actors.split(",") if item.strip()],
+            max_chars=args.chunk_chars,
+        )
+    elif args.command == "rag-query":
+        index = JsonRagIndex(args.index)
+        scope = RetrievalScope(
+            actor=args.actor,
+            project_ids=tuple(args.project_ids),
+            include_inactive=args.include_inactive,
+            include_archived=args.include_archived,
+            max_results=args.max_results,
+            max_chars=args.max_chars,
+        )
+        result = {
+            "query": " ".join(args.query),
+            "scope": vars(scope),
+            "hits": [{"content": hit.record.content, "score": hit.score, "matched_terms": hit.matched_terms, "citation": hit.citation()} for hit in index.search(" ".join(args.query), scope)],
+        }
+    elif args.command == "rag-audit":
+        result = JsonRagIndex(args.index).audit()
     elif args.command == "add-employee":
         result = register_employee(args.path, {
             "employee_id": args.employee_id,
