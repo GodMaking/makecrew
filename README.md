@@ -195,6 +195,8 @@ MakeCrew 提供的是一套可运行的底座，不是固定数量的“虚拟�
 
 第一次使用请看 [`docs/getting-started.md`](docs/getting-started.md)；自适应分流规则见 [`docs/adaptive-routing.md`](docs/adaptive-routing.md)；可复制提示词见 [`docs/prompt-pack.md`](docs/prompt-pack.md)，平台接入见 [`docs/platform-adapters.md`](docs/platform-adapters.md)。
 
+RAG 作用域检索、权限边界、引用和宿主向量库接入见 [`docs/rag.md`](docs/rag.md)。
+
 也可以先初始化工作区并检查宿主工具：
 
 ```bash
