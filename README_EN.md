@@ -67,7 +67,7 @@ MakeCrew does not call a fixed crowd of agents just to demonstrate “multi-agen
 - **Preserve relevant memory for long-running projects**: RAG retrieval is scoped by company, project, task, and employee identity, so workers receive relevant excerpts and deltas instead of full chat histories.
 - **Turn failures into reviewable improvements**: rework, negative feedback, and repeated problems trigger proposals that must beat the baseline in replay before adoption.
 
-### Real scenarios to demonstrate
+### Verifiable use cases
 
 1. Submit an incomplete website idea and observe how the AI clarifies users, features, constraints, and acceptance criteria before matching development and design capabilities.
 2. Submit a task in a workspace with many Skills and inspect which local Skills were selected, why they were selected, and how the result was verified.
@@ -75,7 +75,7 @@ MakeCrew does not call a fixed crowd of agents just to demonstrate “multi-agen
 4. Resume a long-running project using scoped project memory and cited RAG results instead of sending the entire conversation history again.
 5. Replay the same failed task before and after an improvement proposal, then adopt the change only when the candidate performs better.
 
-These demonstrations are also acceptance tests. MakeCrew does not treat a generated plan as completed work: host-side execution, tests, source traceability, and delivery evidence remain explicit.
+These use cases are also acceptance tests. MakeCrew does not treat a generated plan as completed work: host-side execution, tests, source traceability, and delivery evidence remain explicit.
 
 ## User-defined team size
 
