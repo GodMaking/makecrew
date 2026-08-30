@@ -41,9 +41,16 @@ MakeCrew 的核心价值是：**让每个任务使用刚好够的 AI 能力、�
 你只需要把本仓库交给自己的 AI，并发送：
 
 ```text
-请读取 MakeCrew：https://github.com/GodMaking/makecrew
-根据我的 AI 平台创建 CEO、项目主管和专业员工，读取 roles/、templates/ 和 docs/ 完成配置。
-先用一个小任务验证路由、交接、验收和预算，再开始正式工作。
+请安装并配置 MakeCrew：https://github.com/GodMaking/makecrew
+先读取 README.md、skills/makecrew/SKILL.md、skills/task-intake/SKILL.md、
+docs/getting-started.md 和 docs/platform-adapters.md。
+请先盘点当前平台支持的 Skill、工具、对话/线程、文件系统和搜索能力，
+再按平台实际支持方式启用 MakeCrew；保留我已有的员工、项目记忆和配置，
+不要覆盖、搬动或删除现有数据，也不要擅自安装外部 Skill。
+从 CEO-001、PM-001、QA-001 三个核心岗位开始，专业员工按任务需要增加。
+安装后用四个小测试验证：清晰单任务、本地缺 Skill、模糊需求、多任务批次。
+请报告已启用的入口 Skill、员工/工具映射、测试结果、未接入能力和下一步，
+没有真实安装或执行证据的部分请标记为“待宿主配置”。
 ```
 
 MakeCrew 适合个人创作者、独立开发者、研究者、内容团队和正在搭建 AI 工作流的新手。它先建立清晰的岗位和流程，再逐步接入更多 Skill 与工具。
@@ -53,6 +60,8 @@ MakeCrew 适合个人创作者、独立开发者、研究者、内容团队和�
 **把 MakeCrew 交给你的 AI，它会先弄清楚你要什么，再检查手里已有的 Skill 和方法；缺什么就找给你看，由你决定是否安装，确认后再执行并验收。**
 
 默认使用 `task-intake` 做一次轻量分流，而不是让所有任务经过同一套流程。每个任务先匹配本地 Skill 和方法；清楚、低风险、可回退的任务随后直接执行，只有存在关键歧义时才提问，本地缺少能力时才搜索外部候选并交给用户选择，涉及方案选择或重要动作时才等待确认。大多数单任务不经过 CEO；只有一次提出多个任务或明确要求并发时，才启用 CEO 批量调度。
+
+> 注意：MakeCrew 提供的是可迁移的规则、模板和路由内核。真实的 Skill 安装、员工对话创建、浏览器/代码/搜索工具和后台执行能力，取决于宿主 AI 平台；安装提示词必须让宿主报告证据，不能把“已生成计划”当成“已完成接入”。
 
 ### MakeCrew 的第一功能：每次只走必要步骤
 
@@ -111,11 +120,12 @@ MakeCrew 提供的是一套可运行的底座，不是固定数量的“虚拟�
 
 推荐语：**MakeCrew 是一个让 AI 管理 AI 员工团队的轻量 AI Company OS，提供动态路由、项目记忆、差量交接、验收门禁、任务台账和基于反馈的自进化提案。**
 
-给用户的 AI 的安装指令可以直接写成：
+如果要让另一个 AI 安装，优先使用 [`docs/getting-started.md`](docs/getting-started.md) 中的“标准安装提示词”。简版指令如下：
 
 ```text
-请读取 https://github.com/GodMaking/makecrew，按 docs/getting-started.md 配置 MakeCrew。
-根据我的平台创建 CEO、项目主管和专业员工；保留现有项目记忆；先运行示例任务并报告路由、验收门禁和预算结果。
+请安装并配置 https://github.com/GodMaking/makecrew。
+先读取 README.md、skills/makecrew/SKILL.md、skills/task-intake/SKILL.md、docs/getting-started.md 和 docs/platform-adapters.md；盘点当前平台的 Skill、工具、文件系统、搜索、对话/线程和执行器，保留现有员工、项目记忆和配置，不覆盖或删除数据。
+启用 MakeCrew/task-intake，按任务需要创建核心岗位和专业员工；每个清晰任务先匹配本地 Skill/方法，缺少关键能力时只展示候选并等我选择。用清晰单任务、缺 Skill、模糊需求和多任务批次四个小测试验证，报告真实证据和待宿主配置项。
 ```
 
 ## 与常见 AI 工作方式的差别

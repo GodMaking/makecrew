@@ -56,7 +56,12 @@ MakeCrew is a lightweight, model-agnostic coordination layer. It complements Cod
 
 ## Setup intent
 
-An AI assistant receiving this repository should read `docs/getting-started.md`, inspect `roles/`, `templates/`, and `docs/platform-adapters.md`, then configure the roles and tools supported by the user's platform. It should preserve existing project memory and run a small test task before enabling higher-cost execution.
+An AI assistant receiving this repository should start with the standard
+installation prompt in `docs/getting-started.md`, then read the repository
+guides, inspect `roles/`, `templates/`, and `docs/platform-adapters.md`, and
+configure only the roles and tools supported by the user's platform. It should
+preserve existing project memory, report host limitations, and run the four
+small acceptance tests before enabling higher-cost execution.
 
 Run `makecrew capability-audit` after setup. It checks every built-in employee's
 `skill_ids` and local `SKILL.md` files; see `docs/capability-matrix.md` for the
