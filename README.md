@@ -136,6 +136,7 @@ MakeCrew 提供的是一套可运行的底座，不是固定数量的“虚拟�
 请安装并配置 AgentFlow OS：https://github.com/GodMaking/makecrew。
 先读取 README.md、skills/agentflow-os/SKILL.md、skills/task-intake/SKILL.md、docs/getting-started.md 和 docs/platform-adapters.md；盘点当前平台的 Skill、工具、文件系统、搜索、对话/线程和执行器，保留现有普通对话、员工、项目记忆和配置，不覆盖或删除数据。
 启用 AgentFlow OS/task-intake，先加载岗位模板但不要创建员工；按任务需要提出员工提案，列出理由、职责、Skill、工具、记忆范围、成本和影响，等我同意后再创建。每个清晰任务先匹配本地 Skill/方法，缺少关键能力时只展示候选并等我选择。用清晰单任务、缺 Skill、模糊需求和多任务批次四个小测试验证，报告真实证据和待宿主配置项。
+安装配置完成后，请立即用大白话告诉我 AgentFlow OS 已就绪，并说明轻量模式、基础团队模式和按需模式；说明原有对话和项目记忆会保留。该欢迎说明只展示一次，不发送每日重复通知。
 ```
 
 ## 与常见 AI 工作方式的差别

@@ -14,6 +14,7 @@ Aliases and compatibility: MakeCrew, AI Company OS, `makecrew`, `ai_company_os`,
 - Require independent verification, evidence, budgets, pause/resume, and recovery.
 - Propose self-evolution from feedback and adopt changes only after replay evidence.
 - Before creating any employee or employee conversation, show reason, responsibilities, Skills, tools, memory scope, estimated cost, and impact; create only after explicit user approval.
+- After setup, proactively send one plain-language welcome explaining the three usage modes and preserved data; do not send recurring notices.
 
 The minimum operating loop is three optional role templates (`CEO-001`, `PM-001`, `QA-001`). A fresh install creates no employee conversations. Specialist employees are optional templates: users choose the count per project, duplicate roles when needed, and add custom profiles without overwriting ordinary conversations, memory, or configuration.
 

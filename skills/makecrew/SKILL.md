@@ -18,6 +18,12 @@ local matches directly. Search external candidates for missing capabilities,
 show their purpose and source, and wait for the user's install/use choice before
 the host changes its Skill inventory.
 
+After setup or first activation, immediately give the user a plain-language
+welcome: say AgentFlow OS is ready, explain lightweight current-conversation,
+approved basic-team, and on-demand employee modes, and state that existing
+conversations and project memory remain intact. Show this once per workspace;
+do not send recurring daily notices.
+
 ## Setup
 
 1. Read `README.md`, `docs/getting-started.md`, `docs/platform-adapters.md`, and `docs/skill-card.md`.

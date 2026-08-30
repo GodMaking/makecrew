@@ -20,6 +20,16 @@ candidates only for unresolved capability gaps or a requested fresh comparison;
 show purpose, source, license, and trade-offs before the user chooses whether to
 install or use one.
 
+## Post-install welcome
+
+After installation or first activation, immediately tell the user in plain
+language that AgentFlow OS is ready and explain the three ways to use it:
+lightweight current-conversation mode, approved basic-team mode, and on-demand
+employee mode. Mention that existing conversations and project memory are kept,
+that a single clear task stays in the current conversation, and that missing
+employees are proposed with reasons before creation. Show this welcome once per
+workspace and do not send recurring daily notices.
+
 ## Employee creation gate
 
 A fresh install loads role templates but creates no employee conversations.
