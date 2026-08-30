@@ -2,7 +2,18 @@
 
 > AI Company OS for Multi-Agent Teams
 
-A lightweight AI Company OS for multi-agent teams. MakeCrew turns one goal into work that can be routed, coordinated, reviewed, resumed, and improved: specialists execute, project leads form the right team, independent reviewers verify, and the CEO handles cross-project decisions.
+A cross-platform AI work entry point and coordination kernel. MakeCrew turns
+natural-language requests into work that can be routed, coordinated, reviewed,
+resumed, and improved. It first understands the request, checks installed Skills
+and local methods, uses local matches directly, and searches external candidates
+for missing capabilities only after that. Single tasks stay in the current
+conversation; CEO scheduling is reserved for explicit multi-task batches,
+dependencies, and cross-project decisions.
+
+MakeCrew is not a fixed virtual employee chatroom or a model-specific runtime.
+Start with three core roles, add project specialists as needed, and connect
+Codex, Claude, Gemini, or a custom Agent host through adapters for real tools
+and conversations.
 
 Keywords: `multi-agent orchestration`, `AI employees`, `agent routing`, `project memory`, `task ledger`, `human-in-the-loop`, `token-efficient workflows`.
 
