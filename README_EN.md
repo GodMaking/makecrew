@@ -43,6 +43,40 @@ needs, while keeping the work verifiable, resumable, and improvable.
 | Transparent execution state | Local planning works without an API key and reports queued work honestly until an executor is connected | Local rule router and serializable plans |
 | Progressive Skill disclosure | Load only metadata at inventory time, instructions after matching, and references/scripts on demand | `load_policy` separates metadata, instructions, and resources |
 
+## Installed many Skills, but the AI still does not use them?
+
+Installing a Skill gives an AI a capability; it does not guarantee that the AI will discover, combine, and verify that capability for the right task. AgentFlow OS adds the missing work loop: understand the actual outcome, inspect local Skills, tools, methods, and project memory, select only what the current task needs, execute, and verify the result with evidence.
+
+```text
+User submits a task
+  -> determine whether the request is clear and ask only for material gaps
+  -> inspect local Skills, tools, methods, and project memory
+  -> execute one task in the current conversation; use CEO scheduling for batches
+  -> run, verify, preserve failure reasons and resumable state
+  -> propose self-evolution only after negative feedback, rework, or repeated failure
+```
+
+AgentFlow OS does not call a fixed crowd of agents just to demonstrate “multi-agent” behavior. A task that needs one capability takes the shortest path. Multiple specialists are assembled only when the task needs them. Supervisory scheduling, dependencies, and consolidated QA appear only for explicit multi-task batches.
+
+## What can you do with AgentFlow OS?
+
+- **Turn a vague idea into an executable task**: clarification is `0-N`, not a fixed questionnaire. Clear requests proceed immediately; material gaps are asked about until the task is decision-ready.
+- **Make the AI select installed capabilities proactively**: every clear task matches local Skills and methods first. Missing critical capabilities become traceable candidates that the user may choose to install or use.
+- **Assemble the right experts for one task**: use one specialist for one capability, or create a temporary panel when development, research, design, and other disciplines are genuinely required.
+- **Run several submitted tasks concurrently**: the CEO separates work, declares dependencies, limits concurrency and tool budgets, and returns one consolidated status and QA result.
+- **Preserve relevant memory for long-running projects**: RAG retrieval is scoped by company, project, task, and employee identity, so workers receive relevant excerpts and deltas instead of full chat histories.
+- **Turn failures into reviewable improvements**: rework, negative feedback, and repeated problems trigger proposals that must beat the baseline in replay before adoption.
+
+### Real scenarios to demonstrate
+
+1. Submit an incomplete website idea and observe how the AI clarifies users, features, constraints, and acceptance criteria before matching development and design capabilities.
+2. Submit a task in a workspace with many Skills and inspect which local Skills were selected, why they were selected, and how the result was verified.
+3. Submit five independent tasks at once and show the CEO dispatching only necessary workers with explicit dependencies, concurrency, budgets, and consolidated QA.
+4. Resume a long-running project using scoped project memory and cited RAG results instead of sending the entire conversation history again.
+5. Replay the same failed task before and after an improvement proposal, then adopt the change only when the candidate performs better.
+
+These demonstrations are also acceptance tests. AgentFlow OS does not treat a generated plan as completed work: host-side execution, tests, source traceability, and delivery evidence remain explicit.
+
 ## User-defined team size
 
 AgentFlow OS ships a runnable foundation rather than a fixed headcount. The
