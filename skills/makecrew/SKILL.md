@@ -1,16 +1,16 @@
 ---
 name: makecrew
-description: Set up and operate MakeCrew, an AI Company OS for routing work across AI employees with project memory, review gates, resumable task state, and evidence-based learning.
+description: Compatibility entry for AgentFlow OS (formerly MakeCrew), an adaptive AI work operating system for requirement clarification, local-first Skill discovery, Agent routing, project memory, review gates, resumable task state, and evidence-based self-evolution.
 ---
 
-# MakeCrew Skill
+# MakeCrew Compatibility Skill for AgentFlow OS
 
-Use this skill when a user wants AI to manage a team of AI employees, coordinate coding/research/content/design work, preserve project context, reduce repeated conversation history, or add review and budget controls.
+Use this skill when a user wants an AI work operating system to clarify vague requests, discover Skills and methods, coordinate coding/research/content/design work, preserve project context, reduce repeated conversation history, or add review and budget controls. The legacy Skill ID is `makecrew`.
 
 For a single new task, prefer the companion `task-intake` Skill. It selects the
 shortest reliable path in the current conversation: routine tasks execute
 directly, while clarification, discovery, confirmation, an expert panel, and
-learning are added only when triggered. Keep MakeCrew's CEO/orchestrator path
+learning are added only when triggered. Keep AgentFlow OS's CEO/orchestrator path
 for explicit multi-task parallel work or cross-project decisions.
 
 For every clear task, inspect and match the host's installed Skills first. Use
@@ -24,17 +24,18 @@ the host changes its Skill inventory.
 2. Inspect `roles/` and `templates/` before creating any new employee.
 3. Run `makecrew init --path WORKSPACE --project PROJECT` or call `initialize_workspace()`.
 4. Run `makecrew audit --tools TOOL1,TOOL2` and report missing capabilities before execution.
-5. Preserve existing project memory and employee conversations; add only missing files.
+5. Preserve existing ordinary conversations, employee conversations, project memory, and configuration; add only missing files. Load templates without creating employees.
 
-The minimum operating loop is three core roles: `CEO-001`, `PM-001`, and
-`QA-001`. Specialist roles are optional templates. Let the user choose the
-count per project; duplicate a template when parallel capacity is useful, or
-add a custom profile with `makecrew add-employee`. Never create a large fixed
-roster just to make the team look complete.
+The minimum operating loop is three optional templates: `CEO-001`, `PM-001`,
+and `QA-001`. Specialist roles are optional templates. When a role is missing,
+first show an `employee_proposals` item with its reason, responsibilities,
+Skills, tools, memory scope, estimated cost, and impact. Wait for explicit user
+approval before creating an employee or conversation. Never create a large
+fixed roster just to make the team look complete.
 
 ## Operating loop
 
-Route the task, assign a unique employee ID, pass the smallest useful context, record task state and usage, collect evidence, and send a delta handoff. Use `CrewOrchestrator` (or an equivalent host adapter) to dispatch the payload to the real employee conversation. If no matching profile exists, create a temporary employee; promote only when repeated work justifies it. Public or irreversible actions require user confirmation.
+Route the task, assign a unique employee ID, pass the smallest useful context, record task state and usage, collect evidence, and send a delta handoff. Use `CrewOrchestrator` (or an equivalent host adapter) to dispatch the payload to the real employee conversation. If no matching profile exists, return an employee proposal and wait for approval; promote only when repeated work justifies it. Public or irreversible actions require user confirmation.
 
 For an explicit multi-task request, use `BatchScheduler`: register tasks in
 dependency order, call `dispatch_ready()`, and report one compact overview.

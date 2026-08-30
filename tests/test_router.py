@@ -67,6 +67,7 @@ class RouteTaskTests(unittest.TestCase):
 
     def test_skill_worker_contract_is_available(self):
         self.assertTrue(Path(__file__).parents[1].joinpath("roles", "skill-worker.md").exists())
+        self.assertTrue(Path(__file__).parents[1].joinpath("skills", "agentflow-os", "SKILL.md").exists())
 
     def test_independent_qa_role_contract_is_available(self):
         self.assertTrue(Path(__file__).parents[1].joinpath("roles", "qa.md").exists())

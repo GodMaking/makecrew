@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- AgentFlow OS 品牌与 AI 可发现性入口：保留 MakeCrew、`makecrew` 命令、Skill ID 和 GitHub 地址作为兼容别名。
 - `task-intake` Skill：单任务在当前对话内完成需求澄清、Skill/工具规划、确认和执行。
 - 单任务方法/Skill 发现阶段，以及验收后的自进化记录、提案和回放契约。
 - `plan_batch()`：显式多任务请求继续使用 CEO 批量拆分和并发调度。
@@ -11,6 +12,7 @@
 - 可序列化工作流图：节点依赖、并行组、输出契约、持久检查点和人审中断点；单任务简报会直接携带该图。
 
 ### Changed
+- 项目对外品牌由 MakeCrew 更新为 AgentFlow OS（智流工作系统），突出自适应需求入口、Skill 发现、Agent 路由和可验收执行。
 - 新手安装教程升级为可复制的宿主 AI 安装提示词：先盘点平台能力、保护已有配置、按平台启用入口 Skill，并用四类小任务验证真实接入状态。
 - README、英文 README、Skill 卡片、Python 包描述和 GitHub 定位统一为“本地优先 Skill 匹配的跨平台 AI 工作入口”，突出单任务短路径与多任务调度的边界。
 - MakeCrew 默认推荐单任务入口，CEO 调度保留给多任务并发和跨项目决策。

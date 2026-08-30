@@ -69,9 +69,10 @@ request or explicitly asks the CEO to coordinate several tasks. Then:
 
 1. CEO classifies each task and creates a minimal task packet.
 2. Reuse registered employee conversations first.
-3. If a task has no suitable employee, create only the missing employee
-   conversation with a scoped role, required skills, tools, memory scope, and
-   acceptance checks.
+3. If a task has no suitable employee, first propose the missing employee with
+   its reason, responsibilities, required Skills, tools, memory scope,
+   estimated cost, and impact. Create the employee conversation only after
+   explicit user approval.
 4. Dispatch independent tasks in parallel and keep dependencies explicit.
 5. Return one compact status table and one consolidated QA summary.
 

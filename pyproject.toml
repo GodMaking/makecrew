@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ai-company-os"
+name = "agentflow-os"
 version = "0.2.0"
-description = "MakeCrew: an adaptive, model-agnostic AI work entry point with local-first Skill matching, multi-agent routing, verification, recovery, and evidence-gated improvement"
+description = "AgentFlow OS (formerly MakeCrew): an adaptive, model-agnostic AI work operating system with requirement clarification, local-first Skill discovery, agent routing, memory, verification, recovery, and evidence-gated self-evolution"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}
@@ -19,6 +19,8 @@ Repository = "https://github.com/GodMaking/makecrew"
 ai-company-route = "ai_company_os.cli:main"
 ai-company-demo = "ai_company_os.web:serve"
 makecrew = "ai_company_os.bootstrap_cli:main"
+agentflow = "ai_company_os.bootstrap_cli:main"
+agentflow-route = "ai_company_os.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["ai_company_os*"]

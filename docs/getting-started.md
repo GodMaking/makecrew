@@ -1,6 +1,6 @@
-# Getting Started / 5 分钟上手
+# AgentFlow OS / 5 分钟上手
 
-这套方法不依赖特定模型、插件或编程语言。单个清晰任务可以留在一个对话中；只有多个独立任务、跨项目决策或需要并发时，才使用多个 Agent/对话。
+AgentFlow OS（旧名 MakeCrew）不依赖特定模型、插件或编程语言。单个清晰任务可以留在一个对话中；只有多个独立任务、跨项目决策或需要并发时，才使用多个 Agent/对话。
 
 ## 给宿主 AI 的标准安装提示词
 
@@ -10,7 +10,7 @@
 请安装并配置 MakeCrew：https://github.com/GodMaking/makecrew
 
 安装前：
-1. 读取 README.md、skills/makecrew/SKILL.md、skills/task-intake/SKILL.md、
+1. 读取 README.md、skills/agentflow-os/SKILL.md、skills/task-intake/SKILL.md、
    docs/getting-started.md 和 docs/platform-adapters.md。
 2. 盘点当前平台支持的 Skill、工具、文件系统、搜索、对话/线程和执行器。
 3. 读取已有普通对话、员工、项目记忆和配置；保留原内容，不覆盖、搬动或删除。

@@ -13,7 +13,7 @@ from .capabilities import audit_employee_capabilities
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Initialize or audit a MakeCrew workspace")
+    parser = argparse.ArgumentParser(description="Initialize or audit an AgentFlow OS workspace")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     init = subparsers.add_parser("init", help="create a minimal .makecrew workspace")
@@ -47,7 +47,7 @@ def main(argv: list[str] | None = None) -> int:
     intake.add_argument(
         "--installed-skills",
         default=None,
-        help="comma-separated skill IDs reported by the host; omitted uses MakeCrew bundled skills",
+        help="comma-separated skill IDs reported by the host; omitted uses AgentFlow OS bundled skills",
     )
 
     batch = subparsers.add_parser("batch-plan", help="plan multiple tasks for CEO fan-out")

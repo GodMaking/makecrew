@@ -1,4 +1,4 @@
-"""MakeCrew local MVP: an AI Company OS for multi-agent teams."""
+"""AgentFlow OS local MVP; MakeCrew remains the compatibility name."""
 
 from .router import route_task
 from .task_state import TaskLedger, TaskStatus
