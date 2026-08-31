@@ -12,7 +12,7 @@ upgrade.
 | `CEO-001` | Cross-project goals and resource decisions | intake, interview, planning, context, verification, self-evolution |
 | `PM-001` | Project decomposition and coordination | intake, planning, parallel dispatch, context, verification, self-evolution |
 | `QA-001` | Independent acceptance | intake, verification, TDD, debugging, context, self-evolution |
-| `ENG-001` | Engineering delivery | intake, TDD, debugging, frontend, API, Git, CI/CD, launch, context, self-evolution |
+| `ENG-001` | Engineering delivery | intake, product delivery, TDD, debugging, frontend, API, Git, CI/CD, launch, context, self-evolution |
 | `RES-001` | Research and evidence | intake, source-driven research, context, verification, self-evolution |
 | `CON-001` | Content and copy | intake, interview, source-driven research, context, verification, self-evolution |
 | `DES-001` | UI and visual delivery | intake, frontend UI, context, verification, self-evolution |

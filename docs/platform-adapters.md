@@ -25,7 +25,9 @@
 单任务澄清时，宿主模型先判断仍有哪些会改变结果的缺口，并以
 `material_gaps=[{"question_id", "prompt", "reason"}]` 传给 `plan_request()`。
 每轮展示 1-3 项；用户回答后把已解决 ID 写入 `answered_question_ids`，直到
-`clarification.ready` 为 `true`，或用户授权使用默认值。
+`clarification.ready` 为 `true`，或用户授权使用默认值。用户的答案应通过
+`answers={question_id: value}` 一并传回；仅传 ID 的旧适配器仍可运行，但无法
+把回答内容带入后续方案。
 
 需求清晰后，宿主应把实际已安装 Skill ID 传入 `installed_skill_ids`。
 `plan_request()` 先做本地匹配；存在缺口时，再把缺失 ID 传给
