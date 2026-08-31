@@ -36,7 +36,7 @@ class BatchScheduler:
         self.thread_adapter = thread_adapter
         self._tasks: OrderedDict[str, dict[str, Any]] = OrderedDict()
         self._usage = {"tool_calls": 0}
-        self._threads: dict[tuple[str, str], str] = {}
+        self._threads: dict[tuple[str, str, str], str] = {}
 
     def add(
         self,
@@ -44,6 +44,8 @@ class BatchScheduler:
         *,
         task_id: str,
         project: str = "",
+        supervisor_id: str = "",
+        isolated_thread: bool = False,
         depends_on: list[str] | tuple[str, ...] | None = None,
         budget: int | dict[str, int] = 1,
     ) -> dict[str, Any]:
@@ -66,6 +68,8 @@ class BatchScheduler:
             "task_id": task_id,
             "task": clean,
             "project": project,
+            "supervisor_id": supervisor_id,
+            "isolated_thread": isolated_thread,
             "depends_on": dependencies,
             "budget": limits,
             "usage": {"tool_calls": 0},
@@ -157,7 +161,8 @@ class BatchScheduler:
             thread_id = ""
             reused = False
             if self.thread_adapter is not None:
-                key = (record["employee_id"], record["project"])
+                scope = record["task_id"] if record.get("isolated_thread") else "shared"
+                key = (record["employee_id"], record["project"], f"{record.get('supervisor_id', '')}:{scope}")
                 if key in self._threads:
                     thread_id = self._threads[key]
                     reused = True
@@ -180,6 +185,8 @@ class BatchScheduler:
 
     def mark_done(self, task_id: str, *, usage: dict[str, int] | None = None) -> dict[str, Any]:
         record = self._get(task_id)
+        if record["status"] not in {"pending", "running", "review"}:
+            raise ValueError(f"当前状态不可标记完成：{task_id}")
         if record["status"] == "cancelled":
             raise ValueError(f"任务已取消：{task_id}")
         calls = int((usage or {}).get("tool_calls", 0))
@@ -193,6 +200,8 @@ class BatchScheduler:
     def mark_failed(self, task_id: str, *, reason: str = "", usage: dict[str, int] | None = None) -> dict[str, Any]:
         """Finish a task as failed while keeping a compact, actionable reason."""
         record = self._get(task_id)
+        if record["status"] not in {"pending", "running", "review", "paused"}:
+            raise ValueError(f"当前状态不可标记失败：{task_id}")
         if record["status"] in TERMINAL:
             return self.snapshot(task_id)
         calls = int((usage or {}).get("tool_calls", 0))

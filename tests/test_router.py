@@ -167,6 +167,14 @@ class TaskLedgerTests(unittest.TestCase):
         self.assertEqual(snapshot["usage"], {"tool_calls": 2, "rounds": 1})
         self.assertEqual(snapshot["budget_remaining"], {"tool_calls": 2, "rounds": 3})
 
+    def test_task_budget_is_a_hard_ceiling(self):
+        ledger = TaskLedger()
+        task = ledger.create("有限预算任务", budget={"tool_calls": 2, "rounds": 2})
+        ledger.record_usage(task.task_id, tool_calls=2)
+
+        with self.assertRaises(ValueError):
+            ledger.record_usage(task.task_id, tool_calls=1)
+
 
 class LearningEngineTests(unittest.TestCase):
     def test_propose_is_idempotent_for_the_same_evidence(self):
@@ -289,6 +297,46 @@ class BootstrapTests(unittest.TestCase):
 
 
 class OrchestrationTests(unittest.TestCase):
+    def test_known_product_work_is_gated_before_dispatch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            initialize_workspace(directory)
+            register_employee(directory, {
+                "employee_id": "ENG-001",
+                "name": "工程员工",
+                "department": "工程",
+                "skills": ["代码"],
+                "tools": ["shell"],
+            }, approved=True)
+
+            result = CrewOrchestrator(directory).dispatch("我想开发一个网站", project="demo")
+
+            self.assertEqual(result["status"], "needs_clarification")
+            self.assertEqual(result["dispatch_mode"], "intake_gate")
+            self.assertEqual(result["execution"]["status"], "not_dispatched")
+
+    def test_busy_employee_returns_user_choices_before_dispatch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            initialize_workspace(directory)
+            register_employee(directory, {
+                "employee_id": "ENG-001",
+                "name": "工程员工",
+                "department": "工程",
+                "skills": ["代码"],
+                "tools": ["shell"],
+            }, approved=True)
+            path = Path(directory, ".makecrew", "employee-registry.json")
+            registry = json.loads(path.read_text(encoding="utf-8"))
+            registry["ENG-001"].update({"availability": "busy", "active_task_ids": ["T-001"]})
+            path.write_text(json.dumps(registry, ensure_ascii=False), encoding="utf-8")
+
+            result = CrewOrchestrator(directory).dispatch(
+                "修复登录页面的表单校验", project="demo", supervisor_id="PM-DEMO-001"
+            )
+
+            self.assertEqual(result["status"], "awaiting_employee_choice")
+            self.assertEqual(result["busy_conflicts"][0]["current_task_ids"], ["T-001"])
+            self.assertIn("queue", result["busy_conflicts"][0]["choices"])
+
     def test_dispatch_prefers_existing_specialist_and_keeps_ceo_as_delegate(self):
         with tempfile.TemporaryDirectory() as directory:
             initialize_workspace(directory, project="demo")
@@ -341,7 +389,7 @@ class OrchestrationTests(unittest.TestCase):
 
             result = orchestrator.dispatch("处理一个全新领域的特殊任务", approved_employee_ids=[employee_id])
 
-            self.assertEqual(result["status"], "dispatched")
+            self.assertEqual(result["status"], "queued")
             self.assertEqual(result["dispatch_mode"], "created_after_approval")
             self.assertEqual(result["employee_proposals"][0]["status"], "created_after_user_approval")
             registry = json.loads(Path(directory, ".makecrew", "employee-registry.json").read_text(encoding="utf-8"))
@@ -363,6 +411,41 @@ class OrchestrationTests(unittest.TestCase):
 
 
 class IntakePlannerTests(unittest.TestCase):
+    def test_product_delivery_mode_adds_design_before_code_gates(self):
+        result = plan_request("我要开发一个网站，面向新手用户")
+
+        self.assertEqual(result["mode"], "clarify")
+        self.assertFalse(result["execute"])
+        self.assertTrue(result["product_delivery"]["triggered"])
+
+        answered = plan_request(
+            "我要开发一个网站，面向新手用户",
+            clarification_round=3,
+            answered_question_ids=["project_basis", "audience_and_use", "success_criteria", "constraints", "deadline", "delivery_depth"],
+            answers={
+                "project_basis": "从零开始",
+                "audience_and_use": "新手用户",
+                "success_criteria": "核心流程可运行",
+                "constraints": "使用现有环境",
+                "deadline": "本周",
+                "delivery_depth": "最小可用版本",
+            },
+            confirmed=False,
+        )
+
+        self.assertEqual(answered["mode"], "product_delivery")
+        self.assertEqual(answered["status"], "ready_for_confirmation")
+        self.assertIn("product-delivery", answered["skills"])
+
+    def test_browser_skill_uses_canonical_host_id(self):
+        result = plan_request("用浏览器搜索 GitHub", installed_skill_ids=[
+            "source-driven-development", "verification-before-completion",
+            "browser:control-in-app-browser", "git-workflow-and-versioning",
+        ])
+
+        self.assertIn("browser:control-in-app-browser", result["skills"])
+        self.assertNotIn("browser-control", result["skills"])
+
     def test_clear_routine_task_takes_the_shortest_reliable_path(self):
         result = plan_request("修复登录页表单校验并补测试，项目目录为 demo")
 
@@ -605,10 +688,11 @@ class IntakePlannerTests(unittest.TestCase):
     def test_one_multi_domain_task_uses_current_conversation_expert_panel(self):
         result = plan_request("开发网站并研究目标用户")
 
-        self.assertEqual(result["mode"], "team")
-        self.assertEqual(result["execution_route"], "current_conversation_expert_panel")
+        self.assertEqual(result["mode"], "clarify")
+        self.assertFalse(result["execute"])
+        self.assertTrue(result["product_delivery"]["triggered"])
         self.assertNotEqual(result["lead"], "CEO")
-        self.assertTrue(result["execute"])
+        self.assertFalse(result["execute"])
 
     def test_batch_mode_routes_independent_tasks_to_ceo(self):
         result = plan_batch([
@@ -756,6 +840,23 @@ class BatchSchedulerTests(unittest.TestCase):
 
         self.assertEqual(result[0]["thread_id"], "thread-ENG-001-demo")
         self.assertTrue(result[0]["thread_reused"])
+
+    def test_different_supervisors_get_isolated_employee_threads(self):
+        opened = []
+
+        def open_thread(employee_id, project, role):
+            opened.append((employee_id, project, role))
+            return {"thread_id": f"thread-{len(opened)}", "reused": False}
+
+        scheduler = BatchScheduler(thread_adapter=open_thread)
+        scheduler.add("修复登录页面", task_id="T1", project="demo", supervisor_id="PM-A")
+        scheduler.dispatch_ready()
+        scheduler.mark_done("T1")
+        scheduler.add("补登录测试", task_id="T2", project="demo", supervisor_id="PM-B")
+        result = scheduler.dispatch_ready()
+
+        self.assertEqual(result[0]["thread_id"], "thread-2")
+        self.assertFalse(result[0]["thread_reused"])
 
     def test_global_budget_pauses_later_tasks(self):
         scheduler = BatchScheduler(max_concurrency=3, total_tool_calls=3)

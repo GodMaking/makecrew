@@ -26,6 +26,12 @@ LOCAL_METHODS: dict[str, list[dict[str, Any]]] = {
         "skill_ids": ["interview-me", "planning-and-task-breakdown", "test-driven-development", "frontend-ui-engineering"],
         "why": "适合已有项目，能减少需求误解和返工",
         "source": "MakeCrew 内置工程流程",
+    }, {
+        "name": "产品交付门禁",
+        "approach": "需求简报 -> Demo/原型 -> 技术设计 -> 增量实现 -> 独立验收",
+        "skill_ids": ["product-delivery", "planning-and-task-breakdown", "verification-before-completion"],
+        "why": "适合新建或大幅重做网站、应用和产品，先确认方案再投入编码",
+        "source": "MakeCrew 内置工程流程",
     }],
     "研究": [{
         "name": "来源驱动研究",

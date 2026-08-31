@@ -16,6 +16,7 @@ from .bootstrap import initialize_workspace
 from .router import CORE_EMPLOYEE_PROFILES, EMPLOYEE_PROFILES, route_task
 from .capabilities import skill_ids_for_employee
 from .rag_identity import scope_payload, scope_for_employee
+from .intake import plan_request
 
 
 Dispatcher = Callable[[str, dict[str, Any]], dict[str, Any]]
@@ -135,14 +136,38 @@ class CrewOrchestrator:
         task: str,
         *,
         project: str = "",
+        supervisor_id: str = "",
+        task_id: str = "",
         approved_employee_ids: list[str] | tuple[str, ...] | None = None,
         employee_approval: bool = False,
+        confirmed: bool = False,
+        intake_plan: dict[str, Any] | None = None,
+        busy_employee_ids: list[str] | tuple[str, ...] | None = None,
+        busy_policy: str = "ask",
     ) -> dict[str, Any]:
         """Delegate work, waiting for explicit approval when a role is missing."""
+        if busy_policy not in {"ask", "queue", "clone"}:
+            raise ValueError("忙碌员工策略必须是 ask、queue 或 clone")
         plan = route_task(task, project)
+        intake = intake_plan or plan_request(task, confirmed=confirmed)
+        # Known tasks must pass intake before the host dispatcher is called.
+        # Keep the legacy unknown-domain proposal flow for compatibility.
+        if plan["domains"] != ["待澄清"] and intake["status"] != "ready_to_execute":
+            return {
+                "task": task.strip(),
+                "project": project,
+                "supervisor_id": supervisor_id,
+                "status": intake["status"],
+                "dispatch_mode": "intake_gate",
+                "intake": intake,
+                "execution": {"status": "not_dispatched"},
+                "next_action": "补齐需求、选择 Skill 或确认当前计划后再次派发。",
+            }
         registry = self._read_registry()
         assignments: list[dict[str, Any]] = []
         proposals: list[dict[str, Any]] = []
+        busy_conflicts: list[dict[str, Any]] = []
+        busy_ids = set(busy_employee_ids or [])
 
         # A CEO decision remains a management action. The project manager is
         # the execution coordinator; specialists handle any later work items.
@@ -180,11 +205,52 @@ class CrewOrchestrator:
                     proposals.append(proposal)
                     employee_id = proposal["employee_id"]
                     dispatch_mode = "proposed"
+                employee_record = registry.get(employee_id, {})
+                is_busy = (
+                    employee_id in busy_ids
+                    or employee_record.get("availability") == "busy"
+                    or bool(employee_record.get("active_task_ids"))
+                )
+                if is_busy:
+                    busy_conflicts.append({
+                        "employee_id": employee_id,
+                        "role": source.get("role", "任务员工"),
+                        "current_task_ids": list(employee_record.get("active_task_ids", [])),
+                        "locked_paths": list(employee_record.get("locked_paths", [])),
+                        "choices": ["queue", "clone", "reroute"],
+                    })
+                    if busy_policy == "queue":
+                        dispatch_mode = "queued_busy"
+                    elif busy_policy == "clone":
+                        clone_id = f"{employee_id}-PARALLEL"
+                        clone_proposal = self._employee_proposal(task, domain, source)
+                        clone_proposal["employee_id"] = clone_id
+                        clone_proposal["name"] = f"{clone_proposal['name']}（并行临时）"
+                        clone_proposal["kind"] = "temporary"
+                        proposals.append(clone_proposal)
+                        employee_id = clone_id
+                        dispatch_mode = "proposed_clone"
                 assignments.append({
                     **source,
                     "employee_id": employee_id,
                     "dispatch_mode": dispatch_mode,
                 })
+
+        if busy_conflicts and busy_policy == "ask":
+            return {
+                "task": task.strip(),
+                "project": project,
+                "supervisor_id": supervisor_id,
+                "route": plan["route"],
+                "lead": plan["lead"],
+                "status": "awaiting_employee_choice",
+                "dispatch_mode": "busy_employee",
+                "assignments": assignments,
+                "busy_conflicts": busy_conflicts,
+                "employee_proposals": proposals,
+                "execution": {"status": "not_dispatched"},
+                "next_action": "请选择等待排队、创建隔离临时员工或改派空闲员工。",
+            }
 
         approved = set(approved_employee_ids or [])
         if employee_approval:
@@ -222,6 +288,13 @@ class CrewOrchestrator:
 
         executions = []
         for assignment in assignments:
+            if assignment["dispatch_mode"] == "queued_busy":
+                executions.append({
+                    "status": "queued",
+                    "employee_id": assignment["employee_id"],
+                    "reason": "员工忙碌，等待当前任务完成",
+                })
+                continue
             rag_scope = scope_for_employee(
                 assignment["employee_id"],
                 project_ids=(project,) if project else (),
@@ -230,6 +303,8 @@ class CrewOrchestrator:
             payload = {
                 "task": task.strip(),
                 "project": project,
+                "supervisor_id": supervisor_id,
+                "task_id": task_id,
                 "assignment": assignment,
                 "rag_scope": scope_payload(rag_scope),
                 "acceptance_gates": plan["acceptance_gates"],
@@ -239,19 +314,27 @@ class CrewOrchestrator:
 
         modes = {assignment["dispatch_mode"] for assignment in assignments}
         mode = next(iter(modes)) if len(modes) == 1 else "mixed"
+        execution_statuses = {item.get("status", "") for item in executions}
+        overall_status = (
+            "failed" if "failed" in execution_statuses
+            else "queued" if execution_statuses and execution_statuses <= {"queued"}
+            else "running" if "running" in execution_statuses
+            else "dispatched"
+        )
         return {
             "task": task.strip(),
             "project": project,
+            "supervisor_id": supervisor_id,
             "route": plan["route"],
             "lead": plan["lead"],
-            "status": "dispatched",
+            "status": overall_status,
             "ceo_action": "delegate",
             "dispatch_mode": mode,
             "executor_id": assignments[0]["employee_id"] if assignments else "",
             "executor_ids": [assignment["employee_id"] for assignment in assignments],
             "assignments": assignments,
             "employee_proposals": proposals,
-            "execution": executions[0] if len(executions) == 1 else {"status": "dispatched", "items": executions},
+            "execution": executions[0] if len(executions) == 1 else {"status": overall_status, "items": executions},
             "verification": plan["verification_contract"],
             "acceptance_gates": plan["acceptance_gates"],
             "next_action": "由独立验收员检查交付；临时员工完成后选择升级为长期员工或归档。",

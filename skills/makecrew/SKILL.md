@@ -13,6 +13,12 @@ directly, while clarification, discovery, confirmation, an expert panel, and
 learning are added only when triggered. Keep MakeCrew's CEO/orchestrator path
 for explicit multi-task parallel work or cross-project decisions.
 
+For substantial website, app, product, or multi-stage feature work, load the
+companion `product-delivery` Skill after intake. It adds a project brief,
+prototype/demo, technical design, incremental implementation, and independent
+verification before delivery. Small fixes and routine work keep the shorter
+path.
+
 For every clear task, inspect and match the host's installed Skills first. Use
 local matches directly. Search external candidates for missing capabilities,
 show their purpose and source, and wait for the user's install/use choice before
@@ -49,6 +55,12 @@ fixed roster just to make the team look complete.
 ## Operating loop
 
 Route the task, assign a unique employee ID, pass the smallest useful context, record task state and usage, collect evidence, and send a delta handoff. Use `CrewOrchestrator` (or an equivalent host adapter) to dispatch the payload to the real employee conversation. If no matching profile exists, return an employee proposal and wait for approval; promote only when repeated work justifies it. Public or irreversible actions require user confirmation.
+
+Before dispatching to a busy employee, inspect its active task IDs and locked
+paths. Report the conflict and let the user choose `queue`, an isolated
+temporary employee/thread, or rerouting to an idle employee. Never merge two
+unrelated supervisor histories into one thread; thread identity includes the
+supervisor, project, and isolation scope.
 
 For an explicit multi-task request, use `BatchScheduler`: register tasks in
 dependency order, call `dispatch_ready()`, and report one compact overview.

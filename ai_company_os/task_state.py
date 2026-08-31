@@ -115,6 +115,18 @@ class TaskLedger:
         if tool_calls < 0 or rounds < 0:
             raise ValueError("用量不能为负数")
         record = self.get(task_id)
+        requested = {
+            "tool_calls": record.usage["tool_calls"] + tool_calls,
+            "rounds": record.usage["rounds"] + rounds,
+        }
+        # A zero budget means "not configured" for backwards compatibility;
+        # positive limits are hard ceilings rather than advisory counters.
+        exceeded = [
+            key for key, value in requested.items()
+            if record.budget.get(key, 0) > 0 and value > record.budget[key]
+        ]
+        if exceeded:
+            raise ValueError(f"任务超出预算：{', '.join(exceeded)}")
         record.usage["tool_calls"] += tool_calls
         record.usage["rounds"] += rounds
         self._persist()

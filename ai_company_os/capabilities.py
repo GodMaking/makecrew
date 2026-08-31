@@ -17,6 +17,7 @@ BUNDLED_SKILLS = (
     "source-driven-development", "frontend-ui-engineering", "api-and-interface-design",
     "git-workflow-and-versioning", "ci-cd-and-automation", "shipping-and-launch",
     "debugging-and-error-recovery", "context-engineering", "self-evolution",
+    "product-delivery",
 )
 
 UPSTREAM_SOURCES: dict[str, dict[str, str]] = {
@@ -117,7 +118,8 @@ EMPLOYEE_SKILL_MATRIX: dict[str, tuple[str, ...]] = {
     "ENG-001": (
         "task-intake", "test-driven-development", "debugging-and-error-recovery",
         "frontend-ui-engineering", "api-and-interface-design", "git-workflow-and-versioning",
-        "ci-cd-and-automation", "shipping-and-launch", "context-engineering", "self-evolution",
+        "ci-cd-and-automation", "shipping-and-launch", "product-delivery",
+        "context-engineering", "self-evolution",
     ),
     "RES-001": (
         "task-intake", "source-driven-development", "context-engineering",

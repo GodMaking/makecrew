@@ -17,6 +17,17 @@ from .workflow import build_workflow
 
 MAX_QUESTIONS_PER_ROUND = 3
 
+# Canonical host Skill IDs. Keep aliases at the boundary so routing never
+# invents a Skill name that the host cannot resolve.
+SKILL_ALIASES = {
+    "browser-control": "browser:control-in-app-browser",
+    "computer-control": "computer-use:computer-use",
+}
+
+PRODUCT_VERBS = ("开发", "搭建", "创建", "构建", "制作", "实现", "重做", "重构")
+PRODUCT_NOUNS = ("网站", "应用", "app", "产品", "软件", "平台")
+SMALL_CHANGE_HINTS = ("修复", "排查", "补测试", "改一个", "小改", "微调")
+
 PLAN_FIRST_HINTS = (
     "先给方案", "先出方案", "先别执行", "不要执行", "确认后执行",
     "先规划", "先策划", "先分析方案",
@@ -36,6 +47,17 @@ DEFAULT_DELEGATION_HINTS = (
 
 def _gap(question_id: str, prompt: str, reason: str) -> dict[str, str]:
     return {"question_id": question_id, "prompt": prompt, "reason": reason}
+
+
+def _needs_product_delivery(task: str, *, delegated_defaults: bool = False) -> bool:
+    """Detect substantial product work that benefits from design-before-code."""
+    normalized = task.lower()
+    return (
+        not delegated_defaults
+        and any(word in normalized for word in PRODUCT_VERBS)
+        and any(word in normalized for word in PRODUCT_NOUNS)
+        and not any(word in normalized for word in SMALL_CHANGE_HINTS)
+    )
 
 
 def _clarification_gaps(task: str, plan: dict[str, Any]) -> list[dict[str, str]]:
@@ -130,7 +152,7 @@ def _skills_for(domains: list[str], task: str) -> list[str]:
     skills = [item for domain in domains for item in mapping.get(domain, [])]
     normalized = task.lower()
     if "浏览器" in normalized:
-        skills.append("browser-control")
+        skills.append(SKILL_ALIASES["browser-control"])
     if any(word in normalized for word in ("上线", "部署", "发布到生产")):
         skills.extend(["ci-cd-and-automation", "shipping-and-launch"])
     if any(word in normalized for word in ("github", "git ", "提交代码", "推送代码")):
@@ -146,6 +168,7 @@ def _request_mode(
     *,
     unclear: bool,
     capability_gap: bool,
+    delegated_defaults: bool = False,
 ) -> tuple[str, bool, bool]:
     """Return mode, confirmation requirement, and discovery requirement."""
     public_or_strategy = plan["requires_user_confirmation"]
@@ -157,6 +180,8 @@ def _request_mode(
         return "guarded", True, discovery_needed
     if plan_first:
         return "plan_first", True, discovery_needed
+    if _needs_product_delivery(task, delegated_defaults=delegated_defaults):
+        return "product_delivery", True, discovery_needed
     if len(plan["domains"]) > 1:
         return "team", False, discovery_needed
     if discovery_needed:
@@ -171,6 +196,10 @@ def _workflow_for(mode: str, *, learning_signal: bool) -> list[str]:
         "discovery": ["方法/Skill 发现", "执行", "验收", "交付"],
         "team": ["动态组队", "并行执行", "统一验收", "交付"],
         "plan_first": ["形成方案", "用户确认", "执行", "验收", "交付"],
+        "product_delivery": [
+            "需求澄清", "产品简报", "Demo/原型", "技术方案", "用户确认",
+            "执行", "验收", "交付",
+        ],
         "guarded": ["确认目标与影响", "用户确认", "执行", "验收", "交付"],
     }
     steps = list(workflows[mode])
@@ -191,17 +220,35 @@ def plan_request(
     clarification_round: int = 1,
     answered_question_ids: Iterable[str] = (),
     material_gaps: Iterable[dict[str, Any]] = (),
+    answers: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Choose the shortest reliable path for one task."""
     clean = task.strip()
-    plan = route_task(clean)
+    answer_values = {
+        str(key).strip(): str(value).strip()
+        for key, value in (answers or {}).items()
+        if str(key).strip() and str(value).strip()
+    }
+    # Answers are kept as compact planning context. The original task remains
+    # the user-facing value and is never replaced by the questionnaire.
+    planning_text = clean
+    if answer_values:
+        planning_text += "\n" + "\n".join(f"{key}: {value}" for key, value in answer_values.items())
+    plan = route_task(planning_text)
     public_action = any(word in clean for word in PUBLIC_ACTIONS)
     if clarification_round < 1:
         raise ValueError("澄清轮次必须大于 0")
     answered_ids = {str(item).strip() for item in answered_question_ids if str(item).strip()}
+    answered_ids.update(answer_values)
     supplied_gaps = list(material_gaps)
     delegated_defaults = any(hint in clean for hint in DEFAULT_DELEGATION_HINTS)
-    base_unclear = plan["needs_clarification"] or (len(clean) < 8 and not public_action) or bool(supplied_gaps)
+    product_bootstrap = _needs_product_delivery(clean, delegated_defaults=delegated_defaults)
+    base_unclear = (
+        plan["needs_clarification"]
+        or (len(clean) < 8 and not public_action)
+        or bool(supplied_gaps)
+        or product_bootstrap
+    )
     builtin_gaps = _clarification_gaps(clean, plan) if base_unclear or answered_ids or clarification_round > 1 else []
     all_gaps = _merge_material_gaps(builtin_gaps, supplied_gaps)
     pending_gaps = [gap for gap in all_gaps if gap["question_id"] not in answered_ids]
@@ -214,12 +261,16 @@ def plan_request(
         plan,
         unclear=unclear,
         capability_gap=capability_gap,
+        delegated_defaults=delegated_defaults,
     )
     questions = [gap["prompt"] for gap in round_gaps]
     if mode == "guarded" and not confirmed:
         questions = ["生产发布确认"] if public_action else []
 
     required_skills = _skills_for(plan["domains"], clean)
+    if mode == "product_delivery":
+        required_skills.insert(0, "product-delivery")
+        required_skills = list(dict.fromkeys(required_skills))
     installed_inventory = list(BUNDLED_SKILLS if installed_skill_ids is None else installed_skill_ids)
     if unclear:
         discovery = discover_methods(clean, ["待澄清"])
@@ -253,7 +304,7 @@ def plan_request(
     else:
         status = "ready_to_execute"
 
-    include_intake = mode in {"clarify", "plan_first", "guarded"}
+    include_intake = mode in {"clarify", "plan_first", "product_delivery", "guarded"}
     external_discovery_used = discovery["external_searched"] or skill_resolution["external_searched"]
     workflow_graph = build_workflow(
         plan["assignments"],
@@ -302,6 +353,11 @@ def plan_request(
             "question_ids": [gap["question_id"] for gap in round_gaps],
             "all_question_ids": [gap["question_id"] for gap in all_gaps],
             "answered_question_ids": sorted(answered_ids),
+            "answer_values": dict(answer_values),
+            "answer_values_complete": not any(
+                gap["question_id"] in answered_ids and gap["question_id"] not in answer_values
+                for gap in all_gaps
+            ),
             "remaining_question_ids": [gap["question_id"] for gap in pending_gaps],
             "has_more": len(pending_gaps) > len(round_gaps),
             "stop_reason": (
@@ -332,6 +388,13 @@ def plan_request(
         "execute": status == "ready_to_execute",
         "execution_route": "current_conversation_expert_panel" if mode == "team" else "current_conversation",
         "token_policy": "只保留当前任务必要上下文，不复制完整员工历史",
+        "product_delivery": {
+            "triggered": product_bootstrap,
+            "artifacts": [
+                "project-brief.md", "product-demo.md", "technical-design.md",
+                "verification-report.md",
+            ] if mode == "product_delivery" else [],
+        },
     }
 
 

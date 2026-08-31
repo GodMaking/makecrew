@@ -56,6 +56,11 @@ separate employee conversation for an ordinary single task.
 8. Trigger learning only after negative feedback, failed verification, rework,
    repeated issues, or an explicit retrospective request.
 
+For a new or substantially redesigned website, app, product, or multi-stage
+feature, select `product-delivery` after intake. It adds a project brief,
+prototype/demo, technical design, and implementation gate; small maintenance
+tasks remain on the direct path.
+
 The host should provide its installed Skill IDs and may provide both
 `skill_searcher(task, missing_skill_ids)` and `method_searcher(task, domains)`
 adapters. Local matching is automatic after clarification. External search is
