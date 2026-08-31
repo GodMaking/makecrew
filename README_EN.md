@@ -43,6 +43,25 @@ needs, while keeping the work verifiable, resumable, and improvable.
 | Transparent execution state | Local planning works without an API key and reports queued work honestly until an executor is connected | Local rule router and serializable plans |
 | Progressive Skill disclosure | Load only metadata at inventory time, instructions after matching, and references/scripts on demand | `load_policy` separates metadata, instructions, and resources |
 
+## How MakeCrew relates to Codex modes
+
+MakeCrew is not a replacement for Codex. Codex `Local`, `Worktree`, and `Cloud`
+environments, together with model, permission, Skill, MCP, and Subagent controls,
+run the actual task. MakeCrew is the coordination layer above them: it decides
+which path, capabilities, context, and acceptance checks this task needs.
+
+```text
+User request -> MakeCrew assesses complexity, matches Skills, prepares context and checks
+             -> simple task: current Codex conversation
+             -> complex task: supervisor, specialists, parallel work, memory, and QA as needed
+             -> Codex host environment performs the execution
+```
+
+Simple tasks keep Codex's shortest path. Long-running projects, ambiguous requests,
+multi-task batches, and cross-specialty work gain MakeCrew's routing, memory, handoffs,
+and verification. Multi-agent work adds planning and tool calls, so MakeCrew enables it
+only when the expected speed or quality gain justifies that cost.
+
 ## Installed many Skills, but the AI still does not use them?
 
 Installing a Skill gives an AI a capability; it does not guarantee that the AI will discover, combine, and verify that capability for the right task. MakeCrew adds the missing work loop: understand the actual outcome, inspect local Skills, tools, methods, and project memory, select only what the current task needs, execute, and verify the result with evidence.
@@ -64,7 +83,7 @@ MakeCrew does not call a fixed crowd of agents just to demonstrate “multi-agen
 - **Make the AI select installed capabilities proactively**: every clear task matches local Skills and methods first. Missing critical capabilities become traceable candidates that the user may choose to install or use.
 - **Assemble the right experts for one task**: use one specialist for one capability, or create a temporary panel when development, research, design, and other disciplines are genuinely required.
 - **Run several submitted tasks concurrently**: the CEO separates work, declares dependencies, limits concurrency and tool budgets, and returns one consolidated status and QA result.
-- **Preserve relevant memory for long-running projects**: RAG retrieval is scoped by company, project, task, and employee identity, so workers receive relevant excerpts and deltas instead of full chat histories.
+- **Preserve relevant memory for long-running projects**: scoped RAG retrieval expands adaptively for query coverage and evidence instead of using a fixed result count, so workers receive necessary excerpts and deltas rather than full chat histories.
 - **Turn failures into reviewable improvements**: rework, negative feedback, and repeated problems trigger proposals that must beat the baseline in replay before adoption.
 
 ### Verifiable use cases
