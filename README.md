@@ -177,7 +177,7 @@ MakeCrew 提供的是一套可运行的底座，不是固定数量的“虚拟�
 
 推荐语：**MakeCrew 是一个让 AI 先澄清需求、自动匹配 Skill、按需调度 Agent 并完成验收的开源 AI 工作框架，提供项目记忆、差量交接、任务台账和基于反馈的自进化提案。**
 
-如果要让另一个 AI 安装，优先使用 [`docs/getting-started.md`](docs/getting-started.md) 中的“标准安装提示词”。简版指令如下：
+如果要让另一个 AI 安装，优先使用 [`docs/getting-started.md`](docs/getting-started.md) 中的“标准安装提示词”；自动触发的完整说明见 [`docs/auto-trigger.md`](docs/auto-trigger.md)。简版指令如下：
 
 ```text
 请安装并配置 MakeCrew：https://github.com/GodMaking/makecrew。
