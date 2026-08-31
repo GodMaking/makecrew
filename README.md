@@ -79,6 +79,19 @@ MakeCrew 的核心价值是：**让每个任务使用刚好够的 AI 能力、�
 
 如果你刚开始使用 AI，却已经遇到“需求说不清、Skill 不会自动调用、项目记忆容易丢、多个任务没人协调”等问题，MakeCrew 可以作为你的第一层 AI 工作管理系统。
 
+### 安装后怎么触发
+
+Skill 有两种触发方式：
+
+- **主动触发**：在 Codex 输入 `$makecrew` 或 `$task-intake`，明确要求先澄清需求、匹配 Skill/工具并给出方案。
+- **自动匹配**：当新任务内容符合 Skill 描述时，Codex 会尝试自动加载；由于这是匹配机制，不是每个新对话的强制钩子，建议安装后执行一次全局入口配置：
+
+```bash
+makecrew install-codex-global-intake --codex-home ~/.codex
+```
+
+该命令只在 `AGENTS.md` 追加带标记的 MakeCrew 规则，保留已有内容并生成一次备份。配置后重启 Codex；以后新建网站、应用、产品、视频、文档或自动化等多步骤任务，会先澄清、列出 Skills/工具和执行简报，得到用户确认后再开始执行。简单查询和状态检查仍可直接处理。
+
 你只需要把本仓库交给自己的 AI，并发送：
 
 ```text
@@ -170,7 +183,7 @@ MakeCrew 提供的是一套可运行的底座，不是固定数量的“虚拟�
 请安装并配置 MakeCrew：https://github.com/GodMaking/makecrew。
 先读取 README.md、skills/makecrew/SKILL.md、skills/task-intake/SKILL.md、docs/getting-started.md 和 docs/platform-adapters.md；盘点当前平台的 Skill、工具、文件系统、搜索、对话/线程和执行器，保留现有普通对话、员工、项目记忆和配置，不覆盖或删除数据。
 启用 MakeCrew/task-intake，先加载岗位模板但不要创建员工；按任务需要提出员工提案，列出理由、职责、Skill、工具、记忆范围、成本和影响，等我同意后再创建。每个清晰任务先匹配本地 Skill/方法，缺少关键能力时只展示候选并等我选择。用清晰单任务、缺 Skill、模糊需求和多任务批次四个小测试验证，报告真实证据和待宿主配置项。
-安装配置完成后，请立即用大白话告诉我 MakeCrew 已就绪，并说明轻量模式、基础团队模式和按需模式；说明原有对话和项目记忆会保留。该欢迎说明只展示一次，不发送每日重复通知。
+安装配置完成后，请运行 `makecrew install-codex-global-intake --codex-home CODEX_HOME`，再用大白话告诉我 MakeCrew 已就绪；说明主动触发 `$makecrew`/`$task-intake`、自动匹配的区别，以及轻量模式、基础团队模式和按需模式；说明原有对话和项目记忆会保留。该欢迎说明只展示一次，不发送每日重复通知。
 ```
 
 ## 与常见 AI 工作方式的差别

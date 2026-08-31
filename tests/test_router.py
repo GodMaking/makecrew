@@ -9,7 +9,12 @@ from urllib.parse import quote
 from ai_company_os.router import route_task
 from ai_company_os.task_state import TaskLedger, TaskStatus
 from ai_company_os.learning import LearningEngine, ProposalStatus
-from ai_company_os.bootstrap import initialize_workspace, audit_tools, register_employee
+from ai_company_os.bootstrap import (
+    audit_tools,
+    initialize_workspace,
+    install_codex_global_intake,
+    register_employee,
+)
 from ai_company_os.web import render_result
 from ai_company_os.web import Handler
 from http.server import ThreadingHTTPServer
@@ -198,6 +203,26 @@ class LearningEngineTests(unittest.TestCase):
 
 
 class BootstrapTests(unittest.TestCase):
+    def test_global_intake_install_preserves_existing_guidance_and_is_idempotent(self):
+        with tempfile.TemporaryDirectory() as directory:
+            agents_path = Path(directory, "AGENTS.md")
+            agents_path.write_text("# Existing rules\n\n- Keep this line.\n", encoding="utf-8")
+
+            first = install_codex_global_intake(directory)
+            first_content = agents_path.read_text(encoding="utf-8")
+            second = install_codex_global_intake(directory)
+            second_content = agents_path.read_text(encoding="utf-8")
+
+            self.assertTrue(first["changed"])
+            self.assertFalse(second["changed"])
+            self.assertEqual(first_content, second_content)
+            self.assertIn("# Existing rules", second_content)
+            self.assertIn("<!-- MAKECREW:GLOBAL-INTAKE:BEGIN -->", second_content)
+            self.assertEqual(second_content.count("MAKECREW:GLOBAL-INTAKE:BEGIN"), 1)
+            self.assertIn("网站、应用、产品、视频、文档、活动或自动化", second_content)
+            self.assertIn("先澄清并展示执行简报", second_content)
+            self.assertIn("用户明确批准后再写文件或调用执行工具", second_content)
+
     def test_initialize_workspace_creates_safe_ai_company_files(self):
         with tempfile.TemporaryDirectory() as directory:
             result = initialize_workspace(directory, project="demo")

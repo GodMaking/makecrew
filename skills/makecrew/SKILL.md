@@ -24,6 +24,13 @@ approved basic-team, and on-demand employee modes, and state that existing
 conversations and project memory remain intact. Show this once per workspace;
 do not send recurring daily notices.
 
+Tell the user how to trigger it: automatic matching may load this skill when a
+task matches the description; explicit `$makecrew` or `$task-intake` always asks
+the host to run intake first. For every new multi-step creation request, explain
+that the host will clarify requirements, show selected Skills/tools and a plan,
+then wait for the user's approval before execution unless the user says “直接
+执行”, “你决定”, or “按默认值执行”.
+
 ## Setup
 
 1. Read `README.md`, `docs/getting-started.md`, `docs/platform-adapters.md`, and `docs/skill-card.md`.

@@ -1,6 +1,6 @@
 ---
 name: task-intake
-description: Select the shortest reliable path, match installed Skills and local methods for every clear task, search unresolved gaps, and ask the user before installing or using external candidates.
+description: Use before executing a new project, website, app, product, video, document, campaign, automation, materially ambiguous request, or multi-task batch; clarify missing requirements, present a plan when needed, match installed Skills and local methods, then execute only after the applicable confirmation gate.
 ---
 
 # Task Intake and Execution

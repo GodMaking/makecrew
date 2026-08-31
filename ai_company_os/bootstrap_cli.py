@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 
-from .bootstrap import audit_tools, initialize_workspace, register_employee
+from .bootstrap import audit_tools, initialize_workspace, install_codex_global_intake, register_employee
 from .orchestrator import CrewOrchestrator
 from .intake import plan_batch, plan_request
 from .batch import BatchScheduler
@@ -15,7 +16,7 @@ from .rag_store import JsonRagIndex, plan_directory
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Initialize or audit an AgentFlow OS workspace")
+    parser = argparse.ArgumentParser(description="Initialize or audit a MakeCrew workspace")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     init = subparsers.add_parser("init", help="create a minimal .makecrew workspace")
@@ -26,6 +27,16 @@ def main(argv: list[str] | None = None) -> int:
     audit.add_argument("--tools", default="", help="comma-separated available tool names")
 
     capability_audit = subparsers.add_parser("capability-audit", help="audit built-in employee skill bindings")
+
+    global_intake = subparsers.add_parser(
+        "install-codex-global-intake",
+        help="make task-intake a persistent default for new Codex conversations",
+    )
+    global_intake.add_argument(
+        "--codex-home",
+        default=str(Path.home() / ".codex"),
+        help="Codex home containing AGENTS.md; defaults to ~/.codex",
+    )
 
     rag_init = subparsers.add_parser("rag-init", help="create an empty persistent RAG index")
     rag_init.add_argument("--index", required=True, help="JSON index path")
@@ -76,7 +87,7 @@ def main(argv: list[str] | None = None) -> int:
     intake.add_argument(
         "--installed-skills",
         default=None,
-        help="comma-separated skill IDs reported by the host; omitted uses AgentFlow OS bundled skills",
+        help="comma-separated skill IDs reported by the host; omitted uses MakeCrew bundled skills",
     )
 
     batch = subparsers.add_parser("batch-plan", help="plan multiple tasks for CEO fan-out")
@@ -103,6 +114,8 @@ def main(argv: list[str] | None = None) -> int:
         result = audit_tools([item for item in args.tools.split(",") if item.strip()])
     elif args.command == "capability-audit":
         result = audit_employee_capabilities()
+    elif args.command == "install-codex-global-intake":
+        result = install_codex_global_intake(args.codex_home)
     elif args.command == "rag-init":
         index = JsonRagIndex(args.index)
         index.save()
