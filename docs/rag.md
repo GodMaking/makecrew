@@ -31,11 +31,30 @@ index = HybridRetriever([
 
 hits = index.search(
     "工程 造价",
-    RetrievalScope(actor="manager", project_ids=("engineering",), max_results=8),
+    RetrievalScope(actor="manager", project_ids=("engineering",)),
 )
 for hit in hits:
     print(hit.record.content, hit.citation())
 ```
+
+### 自适应检索
+
+普通 `search()` 适合兼容已有调用，需要明确的结果条数和字符预算。面向员工工作流时，优先使用
+`search_adaptive()`：它先按权限过滤，再按关键词/语义相关性排序；如果后续记录补齐了查询中尚未覆盖的
+概念，或提供了必要的独立来源，即使分数略低也会继续纳入。检索在相关性明显下降、查询概念已覆盖，或
+达到宿主实际上下文容量时停止，不使用固定的“最多 N 条”规则。
+
+```python
+hits = index.search_adaptive(
+    "工程 造价",
+    RetrievalScope(actor="manager", project_ids=("engineering",), max_chars=20_000),
+    min_score=0.2,
+    score_margin=0.18,
+)
+```
+
+`max_chars` 表示宿主模型本次可承受的上下文容量，不是知识库的检索条数上限。宿主有动态上下文预算时，
+每次把实际预算传入 `max_chars`；预算不足时应先压缩摘要，再展开证据，而不是静默丢弃关键来源。
 
 宿主已有向量服务时，可以只注入语义分数，不改变权限和引用：
 
@@ -53,7 +72,7 @@ index = HybridRetriever(records, semantic_scorer=score, semantic_weight=0.35)
 1. 权限过滤先于相关性评分；员工不能通过换关键词读取其他项目。
 2. `company` 记录可按角色开放；`project` 和 `task` 记录必须匹配项目范围。
 3. `draft`、`superseded`、`archived` 默认不进入生产回答；审计时显式开启对应选项。
-4. 每个主管或员工对话应绑定自己的 `RetrievalScope`，而不是共享全局索引权限。
+4. 每个主管或员工对话应绑定自己的 `RetrievalScope`，而不是共享全局索引权限；共享的是可检索范围，不是把全部正文广播到每个对话。
 5. 结果带来源和证据等级；没有来源的内容不进入“已验证事实”。
 
 ## 员工身份绑定

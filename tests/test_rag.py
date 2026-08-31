@@ -43,6 +43,24 @@ class RagTests(unittest.TestCase):
         self.assertEqual(len(hits), 1)
         self.assertEqual(self.retriever.search("", scope), [])
 
+    def test_adaptive_search_expands_for_query_coverage_without_fixed_result_cap(self):
+        retriever = HybridRetriever([
+            KnowledgeRecord("one", "工程项目的施工流程。" * 20, "projects/eng/one.md", scope="project", project_id="engineering"),
+            KnowledgeRecord("two", "造价数据库。" * 20, "projects/eng/two.md", scope="project", project_id="engineering"),
+        ])
+        scope = RetrievalScope("manager", project_ids=("engineering",), max_results=1, max_chars=2_000)
+        hits = retriever.search_adaptive("工程 造价", scope)
+        self.assertEqual({hit.record.record_id for hit in hits}, {"one", "two"})
+
+    def test_adaptive_search_keeps_context_budget_as_the_only_size_guard(self):
+        retriever = HybridRetriever([
+            KnowledgeRecord("one", "工程项目的施工流程。" * 20, "projects/eng/one.md", scope="project", project_id="engineering"),
+            KnowledgeRecord("two", "造价数据库。" * 20, "projects/eng/two.md", scope="project", project_id="engineering"),
+        ])
+        scope = RetrievalScope("manager", project_ids=("engineering",), max_results=1, max_chars=100)
+        hits = retriever.search_adaptive("工程 造价", scope)
+        self.assertEqual(len(hits), 1)
+
     def test_invalid_scope_is_rejected(self):
         with self.assertRaises(ValueError):
             KnowledgeRecord("bad", "内容", "x.md", scope="project")
@@ -56,6 +74,15 @@ class RagTests(unittest.TestCase):
         retriever = HybridRetriever(self.retriever._records.values(), semantic_scorer=semantic)
         hits = retriever.search("完全不同的说法", RetrievalScope("manager", project_ids=("words",)))
         self.assertEqual(hits[0].record.record_id, "other-1")
+
+    def test_semantic_results_are_still_bound_to_visible_scope(self):
+        def semantic(query, records):
+            return {"private-1": 1.0, "other-1": 0.9}
+
+        retriever = HybridRetriever(self.retriever._records.values(), semantic_scorer=semantic)
+        hits = retriever.search("跨项目查询", RetrievalScope("manager", project_ids=("engineering",)))
+        self.assertNotIn("private-1", [hit.record.record_id for hit in hits])
+        self.assertNotIn("other-1", [hit.record.record_id for hit in hits])
 
     def test_semantic_weight_is_bounded(self):
         with self.assertRaises(ValueError):

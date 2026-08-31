@@ -112,6 +112,8 @@ class Retriever(Protocol):
 
     def search(self, query: str, scope: RetrievalScope) -> list[RetrievalHit]: ...
 
+    def search_adaptive(self, query: str, scope: RetrievalScope, *, min_score: float = 0.2, score_margin: float = 0.18) -> list[RetrievalHit]: ...
+
 
 class SemanticScorer(Protocol):
     """Optional host callback returning normalized semantic scores by record ID."""
@@ -143,8 +145,58 @@ class HybridRetriever:
             self._records.pop(record_id, None)
 
     def search(self, query: str, scope: RetrievalScope) -> list[RetrievalHit]:
+        hits = self._rank(query, scope)
+        return self._select(hits, max_results=scope.max_results, max_chars=scope.max_chars)
+
+    def search_adaptive(
+        self,
+        query: str,
+        scope: RetrievalScope,
+        *,
+        min_score: float = 0.2,
+        score_margin: float = 0.18,
+        max_chars: int | None = None,
+    ) -> list[RetrievalHit]:
+        """Expand recall until relevance and query-coverage signals are satisfied.
+
+        ``max_results`` is intentionally ignored here. The host context budget
+        remains the only size guard, while low-scoring candidates are admitted
+        when they cover an otherwise missing query term.
+        """
+        if not 0 <= min_score <= 1:
+            raise ValueError("min_score 必须在 0 到 1 之间")
+        if score_margin < 0:
+            raise ValueError("score_margin 不能为负数")
+        hits = self._rank(query, scope)
+        if not hits:
+            return []
+        threshold = max(min_score, hits[0].score - score_margin)
+        query_terms = _terms(query)
+        covered: set[str] = set()
+        selected: list[RetrievalHit] = []
+        chars = 0
+        budget = scope.max_chars if max_chars is None else max_chars
+        if budget < 100:
+            raise ValueError("max_chars 至少为 100")
+        for hit in hits:
+            new_terms = set(hit.matched_terms) - covered
+            relevant = hit.score >= threshold
+            if not relevant and not new_terms:
+                continue
+            size = len(hit.record.content)
+            if selected and chars + size > budget:
+                continue
+            selected.append(hit)
+            chars += size
+            covered.update(hit.matched_terms)
+            if query_terms and query_terms.issubset(covered) and hit.score < threshold:
+                break
+        return selected
+
+    def _rank(self, query: str, scope: RetrievalScope) -> list[RetrievalHit]:
         query_terms = _terms(query)
         visible = [record for record in self._records.values() if self._visible(record, scope)]
+        visible_ids = {record.record_id for record in visible}
         semantic_scores: dict[str, float] = {}
         if self.semantic_scorer and visible:
             semantic_scores = self.semantic_scorer(query, visible) or {}
@@ -168,7 +220,11 @@ class HybridRetriever:
             lexical_scores[record.record_id] = lexical + title_bonus + freshness
             matched_terms_by_id[record.record_id] = tuple(sorted(matched))
         max_lexical = max(lexical_scores.values(), default=1.0)
-        candidate_ids = set(lexical_scores) | {record_id for record_id, score in semantic_scores.items() if float(score) > 0 and record_id in self._records}
+        candidate_ids = set(lexical_scores) | {
+            record_id
+            for record_id, score in semantic_scores.items()
+            if float(score) > 0 and record_id in visible_ids
+        }
         hits: list[RetrievalHit] = []
         for record_id in candidate_ids:
             lexical_score = lexical_scores.get(record_id, 0.0)
@@ -177,13 +233,17 @@ class HybridRetriever:
             score = ((1 - self.semantic_weight) * normalized_lexical) + (self.semantic_weight * semantic_score)
             hits.append(RetrievalHit(self._records[record_id], round(score, 6), matched_terms_by_id.get(record_id, ())))
         hits.sort(key=lambda hit: (-hit.score, hit.record.record_id))
+        return hits
+
+    @staticmethod
+    def _select(hits: list[RetrievalHit], *, max_results: int, max_chars: int) -> list[RetrievalHit]:
         selected: list[RetrievalHit] = []
         chars = 0
         for hit in hits:
-            if len(selected) >= scope.max_results:
+            if len(selected) >= max_results:
                 break
             size = len(hit.record.content)
-            if selected and chars + size > scope.max_chars:
+            if selected and chars + size > max_chars:
                 continue
             selected.append(hit)
             chars += size

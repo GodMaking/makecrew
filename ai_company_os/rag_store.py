@@ -177,6 +177,15 @@ class JsonRagIndex:
     def search(self, query: str, scope: RetrievalScope):
         return HybridRetriever(self.records.values()).search(query, scope)
 
+    def search_adaptive(self, query: str, scope: RetrievalScope, *, min_score: float = 0.2, score_margin: float = 0.18, max_chars: int | None = None):
+        return HybridRetriever(self.records.values()).search_adaptive(
+            query,
+            scope,
+            min_score=min_score,
+            score_margin=score_margin,
+            max_chars=max_chars,
+        )
+
     def audit(self) -> dict[str, Any]:
         statuses: dict[str, int] = {}
         scopes: dict[str, int] = {}
