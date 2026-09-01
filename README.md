@@ -422,7 +422,7 @@ CLI 的 `batch-dispatch` 会输出本批次的 `dispatches` 和
 - `CONTRIBUTING.md`、`SECURITY.md`：贡献规范和安全边界
 - `ai_company_os/`、`tests/`：可运行 MVP 与测试
 
-## 适合谁
+## 定位补充
 
 个人开发者、独立创作者、小团队和需要管理多个长期项目的人。它提供的是一套可迁移的工作方法，不绑定某个模型或服务商。
 
