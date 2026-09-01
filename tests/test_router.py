@@ -229,7 +229,7 @@ class BootstrapTests(unittest.TestCase):
             self.assertEqual(second_content.count("MAKECREW:GLOBAL-INTAKE:BEGIN"), 1)
             self.assertIn("网站、应用、产品、视频、文档、活动或自动化", second_content)
             self.assertIn("先澄清并展示执行简报", second_content)
-            self.assertIn("用户明确批准后再写文件或调用执行工具", second_content)
+            self.assertIn("只有这些内容齐全且 Skill/工具匹配完成后", second_content)
 
     def test_initialize_workspace_creates_safe_ai_company_files(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -463,6 +463,36 @@ class IntakePlannerTests(unittest.TestCase):
         self.assertEqual(result["learning_loop"]["stage"], "on_signal")
         self.assertFalse(result["learning_loop"]["enabled_for_this_task"])
 
+    def test_product_request_never_skips_product_delivery_brief(self):
+        result = plan_request(
+            "我想做一个网站，面向新手用户",
+            clarification_round=4,
+            answered_question_ids=[
+                "outcome", "starting_context", "project_basis", "audience_and_use",
+                "success_criteria", "constraints", "deadline", "delivery_depth",
+            ],
+            answers={
+                "outcome": "一个可运行的网站",
+                "starting_context": "从零开始",
+                "project_basis": "从零开始",
+                "audience_and_use": "新手用户",
+                "success_criteria": "核心流程可运行",
+                "constraints": "使用现有环境",
+                "deadline": "本周",
+                "delivery_depth": "最小可用版本",
+            },
+        )
+
+        self.assertEqual(result["mode"], "product_delivery")
+        self.assertEqual(result["status"], "ready_for_confirmation")
+        self.assertFalse(result["execute"])
+        brief = result["execution_brief"]
+        self.assertTrue(brief["ready"])
+        self.assertTrue(brief["selected_skills"])
+        self.assertTrue(brief["tools"])
+        self.assertGreaterEqual(len(brief["workflow"]), 5)
+        self.assertTrue(brief["acceptance_gates"])
+
     def test_installed_skills_are_matched_before_external_search(self):
         calls = []
 
@@ -625,7 +655,9 @@ class IntakePlannerTests(unittest.TestCase):
 
         self.assertTrue(result["clarification"]["ready"])
         self.assertEqual(result["questions"], [])
-        self.assertEqual(result["status"], "ready_to_execute")
+        self.assertEqual(result["status"], "ready_for_confirmation")
+        self.assertTrue(result["execution_brief"]["ready"])
+        self.assertIn("project-brief.md", result["execution_brief"]["deliverables"])
 
     def test_user_can_delegate_unspecified_details_to_ai_defaults(self):
         result = plan_request("做网站，你决定")

@@ -19,6 +19,12 @@ prototype/demo, technical design, incremental implementation, and independent
 verification before delivery. Small fixes and routine work keep the shorter
 path.
 
+For product work, do not move from clarification directly to a bare execution
+confirmation. Recalculate all material gaps after every answer (the 1-3 question
+display is per round, with no total cap), then show an execution brief containing
+selected Skills, tools, methods, workflow, deliverables, acceptance gates,
+budget, and risks before asking for approval.
+
 For every clear task, inspect and match the host's installed Skills first. Use
 local matches directly. Search external candidates for missing capabilities,
 show their purpose and source, and wait for the user's install/use choice before

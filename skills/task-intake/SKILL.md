@@ -28,6 +28,8 @@ separate employee conversation for an ordinary single task.
    delegates remaining details to AI defaults.
    Give each gap a stable ID, prompt, and reason. Merge domain-specific gaps
    from the current model with the built-in gaps; skip IDs already answered.
+   After each answer, map the response back to stable question IDs and recalculate
+   remaining gaps; the 1-3 question display size is per round, never a total limit.
 3. For every decision-ready task, inspect the host's installed Skill inventory
    and match it to the task, tools, and acceptance checks. Use matching local
    Skills directly. When required capability IDs are missing, search external
@@ -37,13 +39,16 @@ separate employee conversation for an ordinary single task.
    Match local methods on every clear task; expand external method search when
    the user needs a fresh comparison, the local catalog has no match, or a
    capability gap remains. Prefer primary sources and label local versus fresh.
-4. For plan-first or consequential work, present an execution brief:
+4. For plan-first, product, or consequential work, present an execution brief before any execution confirmation:
    - selected skills and tools, with a reason for each;
    - candidate methods and Skills, with evidence and trade-offs;
    - planned workflow and deliverables;
    - acceptance checks and likely risks;
    - files, permissions, or user inputs still needed;
    - expected token/cost controls.
+   The brief is a hard gate: include selected Skills and why, tools, methods,
+   workflow, deliverables, acceptance checks, risks, and budget. Do not reduce it
+   to a bare confirmation question.
 5. Wait for the user's choice and explicit confirmation before high-cost, public, destructive, or
    irreversible actions. A bare “continue” or “execute” confirms the presented brief
    only when no new scope has appeared.

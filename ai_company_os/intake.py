@@ -24,7 +24,7 @@ SKILL_ALIASES = {
     "computer-control": "computer-use:computer-use",
 }
 
-PRODUCT_VERBS = ("开发", "搭建", "创建", "构建", "制作", "实现", "重做", "重构")
+PRODUCT_VERBS = ("做", "开发", "搭建", "创建", "构建", "制作", "实现", "重做", "重构")
 PRODUCT_NOUNS = ("网站", "应用", "app", "产品", "软件", "平台")
 SMALL_CHANGE_HINTS = ("修复", "排查", "补测试", "改一个", "小改", "微调")
 
@@ -318,6 +318,39 @@ def plan_request(
     if skill_choice_needed or skill_gap_unresolved:
         workflow_steps.insert(0, "Skill 匹配与选择")
 
+    # Keep the pre-execution contract explicit so a host cannot reduce a
+    # product plan to a bare "execute?" prompt.  The host may render this in
+    # its own UI, but must preserve the gate and its fields.
+    execution_brief = {
+        "goal": clean,
+        "route": mode,
+        "lead": "当前对话主管" if mode in {"team", "product_delivery", "plan_first"} else plan["lead"],
+        "selected_skills": required_skills,
+        "skill_match": {
+            "status": skill_resolution["status"],
+            "matched": skill_resolution["matched_skill_ids"],
+            "missing": skill_resolution["missing_skill_ids"],
+            "candidates": skill_resolution["candidates"],
+        },
+        "tools": sorted({tool for item in plan["assignments"] for tool in item["tools"]}),
+        "workflow": workflow_steps,
+        "deliverables": (
+            [
+                "project-brief.md", "product-demo.md", "technical-design.md",
+                "实现代码、测试结果、verification-report.md",
+            ] if mode == "product_delivery" else [item["output"] for item in plan["assignments"]]
+        ),
+        "acceptance_gates": plan["acceptance_gates"],
+        "budget": plan["budget"],
+        "risks": [
+            "需求仍有未回答的实质缺口" if unclear else "宿主工具或外部 Skill 可能尚未接入",
+            "公开或不可逆动作需要单独确认" if requires_confirmation else "执行结果需要按验收门禁复核",
+        ],
+        "ready": not unclear and not skill_choice_needed and not skill_gap_unresolved,
+        "confirmation_required": requires_confirmation,
+        "confirmation_prompt": "请确认以上目标、Skill、工具、交付物和验收标准后再开始执行。",
+    }
+
     return {
         "task": clean,
         "mode": mode,
@@ -395,6 +428,7 @@ def plan_request(
                 "verification-report.md",
             ] if mode == "product_delivery" else [],
         },
+        "execution_brief": execution_brief,
     }
 
 
