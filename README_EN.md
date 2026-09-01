@@ -18,6 +18,16 @@ and conversations.
 
 Keywords: `MakeCrew`, `AI work operating system`, `AI agent orchestration`, `multi-agent workflow`, `Skill discovery`, `agent routing`, `project memory`, `human-in-the-loop`, `token-efficient AI workflow`, `self-evolving agents`.
 
+## Problems It Solves
+
+Many AI tools can generate output but still start before the request is clear, fail to select the right Skill, become disorganized when work grows complex, lose project context, and finish without verifiable evidence. MakeCrew connects these missing steps into one inspectable workflow:
+
+```text
+Vague idea -> resolve material gaps -> match Skills, tools, and methods
+           -> show plan and acceptance checks -> user confirms -> execute
+           -> verify and deliver -> record reusable lessons when needed
+```
+
 ## Core Advantages
 
 MakeCrew gives each task exactly the AI capability, context, and coordination it
