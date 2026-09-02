@@ -16,6 +16,12 @@ MakeCrew 的意思就是“组建工作团队”。它以 Skill 形式接入 Cod
 
 ## 核心价值
 
+### 方法发现也会借鉴，而不是盲目安装
+
+MakeCrew 自带一组轻量、可追溯的方法卡。任务清楚后，先按领域匹配本地方法；只有用户要求最新比较、当前本地没有匹配或存在能力缺口时，才调用宿主搜索器。每张方法卡都带有稳定 ID、适用时机、边界、交付物、验收证据和成本提示，详细目录见 [`docs/method-catalog.md`](docs/method-catalog.md)。
+
+本项目参考了 `dbskill` 的公开方法结构（内容资产、知识库治理、理论/案例/反例研究、可迁移对标和发布前检查），全部重新抽象为 MakeCrew 的方法卡，不复制其代码、提示词原文或知识原文。`dbskill` 当前版本和许可证记录在 [`docs/method-catalog.md`](docs/method-catalog.md)。这些方法是按任务选择的可选能力，不会自动安装整套 `dbskill`，也不会改变既有员工、对话、RAG 权限和并发流程。
+
 ### Codex Agent 与员工/主管的对应关系
 
 MakeCrew 直接使用 Codex 的原生 Agent，不在框架里另造一套聊天线程：
@@ -440,8 +446,9 @@ python -m ai_company_os.web
 - `ai_company_os.learning`：验收反馈、改进提案和回放评分
 - `ai_company_os.orchestrator.CrewOrchestrator`：读取员工注册表，优先派给现有员工；缺少岗位时先返回完整员工提案，用户批准后才创建并派发，随后返回独立验收任务
 - `ai_company_os.intake.plan_request()`：单任务需求澄清、Skill/工具规划和执行确认
-- `ai_company_os.discovery.discover_methods()`：根据任务返回可追溯的本地方法建议，并支持宿主搜索器注入最新候选
+- `ai_company_os.discovery.discover_methods()`：先按任务信号对本地方法排序；明确需要新资料时再规范化、排序宿主候选。返回的 `returned_count` 只表示展示数量，`external_result_count` 保留搜索总量，便于审计而不把截断误认为搜索结论
 - `ai_company_os.discovery.resolve_skills()`：先匹配已安装 Skill，再为缺失能力搜索候选并生成用户选择状态
+- `ai_company_os.discovery.audit_method_catalog()`：检查内置方法卡的稳定 ID、必填字段和重复项
 - `ai_company_os.intake.plan_batch()`：多任务 CEO 批量调度方案
 - `ai_company_os.batch.BatchScheduler`：依赖图、并发上限、批次/单任务工具预算、暂停恢复、取消、失败记录和员工线程复用
 - `ai_company_os.skill_audit.audit_skill_directory()`：批量检查 Skill 元数据、命名、目录一致性和渐进披露目录

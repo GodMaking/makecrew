@@ -89,6 +89,16 @@ class SkillAuditTests(unittest.TestCase):
             payload = json.loads(output.getvalue())
             self.assertEqual(payload["ready_skill_ids"], ["demo-skill"])
 
+    def test_method_catalog_cli_returns_machine_readable_audit(self):
+        output = StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["method-audit"])
+
+        self.assertEqual(exit_code, 0)
+        payload = json.loads(output.getvalue())
+        self.assertEqual(payload["status"], "pass")
+        self.assertGreater(payload["card_count"], 0)
+
 
 class CheckpointTests(unittest.TestCase):
     def test_json_checkpoint_is_idempotent_and_restores_latest_state(self):

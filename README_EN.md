@@ -110,6 +110,7 @@ MakeCrew does not call a fixed crowd of agents just to demonstrate “multi-agen
 
 - **Turn a vague idea into an executable task**: clarification is `0-N`, not a fixed questionnaire. Clear requests proceed immediately; material gaps are asked about until the task is decision-ready.
 - **Make the AI select installed capabilities proactively**: every clear task matches local Skills and methods first. Missing critical capabilities become traceable candidates that the user may choose to install or use.
+- **Rank methods by the actual task**: local and fresh candidates are normalized, scored by task signals, and returned with match reasons; the display window is bounded without hiding the searched-result count.
 - **Assemble the right experts for one task**: use one specialist for one capability, or create a temporary panel when development, research, design, and other disciplines are genuinely required.
 - **Run several submitted tasks concurrently**: the CEO separates work, declares dependencies, limits concurrency and tool budgets, and returns one consolidated status and QA result.
 - **Preserve relevant memory for long-running projects**: scoped RAG retrieval expands adaptively for query coverage and evidence instead of using a fixed result count, so workers receive necessary excerpts and deltas rather than full chat histories.
@@ -278,6 +279,9 @@ makecrew codex-audit --supervisor-id PM-001
 
 - `skill-audit` catches metadata, directory, and resource-layout issues before a
   Skill is published or updated. It does not replace an existing Skill.
+- `method-audit` checks built-in method IDs and required card fields before a
+  catalog release. Host candidates are normalized before the display window is
+  applied, and malformed entries are reported rather than taking down discovery.
 - `skill-inventory` returns names, descriptions, paths, and status for routing;
   instructions load only after a match, while invalid entries remain visible
   as review items.
