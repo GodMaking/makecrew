@@ -19,6 +19,7 @@ MakeCrew 选择做一层跨平台的任务入口和协调契约，而不是替�
 | [OpenSkills SDK](https://github.com/LingyiChen-AI/OpenSkills) | 三层披露、自动 Skill 调用、引用/脚本按需加载、沙箱 | 将“本地先匹配，外部候选等待用户选择”作为入口契约 | 沙箱由宿主执行器决定，不在零依赖内核伪造 |
 | [LangGraph](https://github.com/langchain-ai/langgraph) | 持久执行、检查点、人审中断、短期/长期记忆、运行追踪 | 可序列化 DAG、任务台账、恢复、确认门禁、分层记忆 | 不强制引入 LangChain 运行时 |
 | [OpenAI Agents SDK](https://github.com/openai/openai-agents-python) | Agents as tools、handoffs、工具、护栏、人审、sessions、tracing | 宿主适配器保留工具、线程、交接、确认和观测接口 | 不绑定 OpenAI API 或模型 |
+| [Codex native subagents](https://developers.openai.com/codex/agent-configuration/subagents) | 根 Agent 创建并行子 Agent，独立上下文，等待/跟进/中断，主线程汇总；子 Agent 继承模型、工具、沙箱和审批 | 把主管映射为父 Agent、员工映射为子 Agent；结构化任务包、结果差量和动态并发判断 | 不重复实现 Codex 的线程生命周期；MakeCrew 只提供跨宿主协调契约 |
 | [CrewAI](https://github.com/crewAIInc/crewAI) | Crews 与事件驱动 Flows 分离，结构化输出和追踪 | 单任务短路径、多任务批次、输出契约和用量记录 | 不为一个简单任务创建完整 Crew |
 | [Microsoft AutoGen](https://github.com/microsoft/autogen) | 消息驱动运行时、AgentChat、AgentTool、MCP | 结构化差量交接和可替换消息适配器 | 不在核心引入分布式运行时 |
 | [MetaGPT](https://github.com/FoundationAgents/MetaGPT) | 软件公司角色、SOP、阶段产物和协作 | 岗位能力契约、阶段产物、验收标准 | MakeCrew 不限定软件开发领域 |

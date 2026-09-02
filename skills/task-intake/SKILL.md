@@ -89,6 +89,15 @@ request or explicitly asks the CEO to coordinate several tasks. Then:
 Do not route a single task through CEO merely because the task uses several
 skills. Several skills can be selected inside the current conversation.
 
+When Codex native subagents are used, map the parent supervisor Agent to the
+MakeCrew supervisor and each child Agent to one employee. The supervisor owns
+decomposition, dependencies, concurrency, waiting, conflict resolution, and
+the final synthesis; employees own bounded execution. Send each employee a
+minimal task packet with its Skill IDs, tools, context delta, file scope, budget,
+and acceptance gates, then collect only a structured result (`summary`,
+`evidence`, `risks`, `next_steps`). Use Codex Worktrees for independent writes
+and keep shared-file work serial.
+
 ## Confirmation rules
 
 Always surface the target and rollback/verification plan before production

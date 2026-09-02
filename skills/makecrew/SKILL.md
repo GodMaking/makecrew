@@ -76,6 +76,16 @@ opening a conversation. `pause`, `resume`, `cancel`, and `mark_failed` preserve
 state and reasons. The scheduler is a queue/state kernel; the host adapter must
 perform actual conversation creation and tool execution.
 
+Codex role mapping is direct: the parent/supervisor Agent manages the batch,
+each Codex subagent is one MakeCrew employee, and the QA Agent independently
+verifies the results. `BatchScheduler.supervisor_id` records the parent Agent;
+every dispatch includes an employee `agent_id`, a supervisor identity, and a
+compact `task_packet`. When the host supplies
+`agent_dispatcher(thread_id, task_packet)`, the packet is handed to the native
+Codex Agent. Employees return only `summary`, `evidence`, `risks`, and
+`next_steps`; the supervisor uses `aggregate_results()` to synthesize the
+user-facing update.
+
 ## Learning loop
 
 On negative feedback, failed verification, rework, repeated issues, or an

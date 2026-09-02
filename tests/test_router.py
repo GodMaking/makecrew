@@ -788,6 +788,101 @@ class IntakePlannerTests(unittest.TestCase):
 
 
 class BatchSchedulerTests(unittest.TestCase):
+    def test_batch_declares_supervisor_and_employee_agent_contract(self):
+        scheduler = BatchScheduler(max_concurrency=2, supervisor_id="PM-DEMO")
+        scheduler.add("研究用户", task_id="T1", project="demo")
+
+        snapshot = scheduler.snapshot("T1")
+
+        self.assertEqual(snapshot["agent_id"], snapshot["employee_id"])
+        self.assertEqual(snapshot["agent_kind"], "employee")
+        self.assertEqual(snapshot["supervisor_id"], "PM-DEMO")
+        self.assertEqual(snapshot["supervisor_kind"], "supervisor")
+        self.assertEqual(snapshot["supervisor_role"], "项目主管")
+        self.assertEqual(snapshot["task_packet"]["employee"]["agent_id"], "RES-001")
+        self.assertEqual(snapshot["task_packet"]["supervisor"]["agent_id"], "PM-DEMO")
+        self.assertIn("acceptance_gates", snapshot["task_packet"])
+        self.assertEqual(snapshot["task_packet"]["file_scope"], [])
+
+    def test_dispatch_returns_codex_ready_employee_packet(self):
+        scheduler = BatchScheduler(supervisor_id="PM-DEMO")
+        scheduler.add("修复登录页面", task_id="T1", project="demo")
+
+        dispatch = scheduler.dispatch_ready()[0]
+
+        self.assertEqual(dispatch["agent_id"], "ENG-001")
+        self.assertEqual(dispatch["agent_kind"], "employee")
+        self.assertEqual(dispatch["supervisor"]["agent_id"], "PM-DEMO")
+        self.assertEqual(dispatch["task_packet"]["task_id"], "T1")
+        self.assertEqual(dispatch["task_packet"]["employee"]["role"], "工程员工")
+        self.assertEqual(dispatch["task_packet"]["execution_contract"], "return_delta_result")
+
+    def test_dispatch_can_hand_off_packet_to_native_agent_adapter(self):
+        sent = []
+
+        def open_thread(employee_id, project, role):
+            return {"thread_id": f"codex-{employee_id}-{project}", "reused": False}
+
+        def send_to_agent(thread_id, packet):
+            sent.append((thread_id, packet["employee"]["agent_id"]))
+            return {"status": "accepted", "run_id": "run-T1"}
+
+        scheduler = BatchScheduler(
+            supervisor_id="PM-DEMO",
+            thread_adapter=open_thread,
+            agent_dispatcher=send_to_agent,
+        )
+        scheduler.add("修复登录页面", task_id="T1", project="demo")
+
+        dispatch = scheduler.dispatch_ready()[0]
+
+        self.assertEqual(sent, [("codex-ENG-001-demo", "ENG-001")])
+        self.assertEqual(dispatch["host_dispatch"]["status"], "accepted")
+        self.assertEqual(dispatch["host_dispatch"]["run_id"], "run-T1")
+
+    def test_same_employee_thread_is_serial_unless_isolated(self):
+        scheduler = BatchScheduler(max_concurrency=2, supervisor_id="PM-DEMO")
+        scheduler.add("修复登录页面", task_id="T1", project="demo")
+        scheduler.add("补登录测试", task_id="T2", project="demo")
+
+        ready = scheduler.ready()
+
+        self.assertEqual([item["task_id"] for item in ready], ["T1"])
+        self.assertEqual(scheduler.snapshot("T2")["status"], "waiting_thread")
+
+    def test_overlapping_write_scopes_wait_but_disjoint_scopes_can_run(self):
+        scheduler = BatchScheduler(max_concurrency=2, supervisor_id="PM-DEMO")
+        scheduler.add("修改首页", task_id="T1", project="demo", file_scope=["src/pages/index.tsx"])
+        scheduler.add("修改首页样式", task_id="T2", project="demo", file_scope=["src/pages/index.tsx"])
+        scheduler.add("修改后台", task_id="T3", project="demo", file_scope=["src/admin.tsx"])
+
+        ready = scheduler.ready()
+
+        self.assertEqual([item["task_id"] for item in ready], ["T1", "T3"])
+        self.assertEqual(scheduler.snapshot("T2")["status"], "waiting_file_conflict")
+        self.assertEqual(scheduler.snapshot("T1")["task_packet"]["isolation"], "worktree_recommended")
+
+    def test_supervisor_can_collect_compact_employee_results(self):
+        scheduler = BatchScheduler(supervisor_id="PM-DEMO")
+        scheduler.add("研究用户", task_id="T1")
+        scheduler.add("写宣传文案", task_id="T2")
+        scheduler.dispatch_ready()
+        scheduler.mark_done("T1", result={
+            "summary": "完成用户画像",
+            "evidence": ["research.md"],
+            "risks": ["样本量有限"],
+            "next_steps": ["交给内容员工使用"],
+        })
+        scheduler.mark_done("T2", result="完成初稿")
+
+        aggregate = scheduler.aggregate_results()
+
+        self.assertEqual(aggregate["supervisor"]["agent_id"], "PM-DEMO")
+        self.assertEqual([item["task_id"] for item in aggregate["completed"]], ["T1", "T2"])
+        self.assertEqual(aggregate["completed"][0]["summary"], "完成用户画像")
+        self.assertEqual(aggregate["completed"][0]["evidence"], ["research.md"])
+        self.assertEqual(aggregate["completed"][1]["summary"], "完成初稿")
+
     def test_can_adjust_concurrency_and_pause_resume_a_task(self):
         scheduler = BatchScheduler(max_concurrency=2)
         scheduler.add("开发网站", task_id="T1")
@@ -889,6 +984,17 @@ class BatchSchedulerTests(unittest.TestCase):
 
         self.assertEqual(result[0]["thread_id"], "thread-2")
         self.assertFalse(result[0]["thread_reused"])
+
+    def test_task_override_uses_actual_supervisor_in_packet(self):
+        scheduler = BatchScheduler(supervisor_id="PM-DEFAULT")
+        scheduler.add("制定季度预算", task_id="T1", project="demo", supervisor_id="CEO-001")
+
+        snapshot = scheduler.snapshot("T1")
+
+        self.assertEqual(snapshot["supervisor_id"], "CEO-001")
+        self.assertEqual(snapshot["supervisor_role"], "CEO")
+        self.assertEqual(snapshot["task_packet"]["supervisor"]["agent_id"], "CEO-001")
+        self.assertEqual(snapshot["task_packet"]["supervisor"]["role"], "CEO")
 
     def test_global_budget_pauses_later_tasks(self):
         scheduler = BatchScheduler(max_concurrency=3, total_tool_calls=3)

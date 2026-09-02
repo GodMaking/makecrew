@@ -96,6 +96,7 @@ def main(argv: list[str] | None = None) -> int:
     batch_dispatch = subparsers.add_parser("batch-dispatch", help="queue a batch with concurrency and budget controls")
     batch_dispatch.add_argument("tasks", nargs="+", help="TASK_ID::task description")
     batch_dispatch.add_argument("--project", default="", help="project shared by this batch")
+    batch_dispatch.add_argument("--supervisor-id", default="PM-001", help="parent supervisor Agent ID")
     batch_dispatch.add_argument("--max-concurrency", type=int, default=3, help="maximum running tasks")
     batch_dispatch.add_argument("--total-tool-calls", type=int, default=None, help="batch tool-call budget")
     batch_dispatch.add_argument(
@@ -169,7 +170,11 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "batch-plan":
         result = plan_batch(args.tasks)
     elif args.command == "batch-dispatch":
-        scheduler = BatchScheduler(max_concurrency=args.max_concurrency, total_tool_calls=args.total_tool_calls)
+        scheduler = BatchScheduler(
+            max_concurrency=args.max_concurrency,
+            total_tool_calls=args.total_tool_calls,
+            supervisor_id=args.supervisor_id,
+        )
         dependencies = _parse_assignments(args.depends_on, "依赖")
         budgets = _parse_assignments(args.task_budget, "任务预算")
         for raw in args.tasks:

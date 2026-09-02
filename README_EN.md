@@ -30,6 +30,25 @@ Vague idea -> resolve material gaps -> match Skills, tools, and methods
 
 ## Core Advantages
 
+### How Codex Agents Map to Employees and Supervisors
+
+MakeCrew uses Codex's native Agents instead of creating a second chat runtime:
+
+| Codex concept | MakeCrew concept | Responsibility |
+|---|---|---|
+| Root thread `/root` | Current conversation, or CEO for cross-project work | Understand the goal; coordinate at the top level only for explicit batches or cross-project decisions |
+| Supervisor Agent | Project supervisor conversation | Decompose work, declare dependencies, choose concurrency, assign employees, wait, resolve conflicts, and synthesize |
+| Subagent | Employee conversation | Complete one bounded task with the assigned Skills, tools, file scope, and budget, then return a structured result |
+| QA Agent | Verification employee | Independently check tests, sources, previews, risks, and definition of done |
+
+The relationship in a batch is:
+
+```text
+CEO/root (when needed) -> supervisor Agent -> employee Agents -> supervisor summary -> QA -> user
+```
+
+The supervisor manages the lifecycle; it does not perform the employee's specialist work. A clear small task still goes directly to the current conversation or one employee, so MakeCrew does not add threads and token cost just to display a multi-agent team.
+
 MakeCrew gives each task exactly the AI capability, context, and coordination it
 needs, while keeping the work verifiable, resumable, and improvable.
 

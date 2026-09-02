@@ -146,6 +146,8 @@ makecrew batch-dispatch --project demo-site --max-concurrency 2 \
 
 `BatchScheduler` 会复用同一项目中同一员工的线程；依赖、并发或预算不满足时任务留在等待状态。运行中可调用 `set_max_concurrency()` 调整上限，用 `pause()/resume()` 暂停和恢复，用 `cancel()` 取消，用 `mark_failed()` 记录失败原因。CLI 只生成宿主适配器的派发清单，真实对话创建和执行由平台适配器完成。
 
+在 Codex 中，一个子 Agent 就是一个 MakeCrew 员工；负责拆分、派发、等待和汇总的父 Agent 是主管。`BatchScheduler` 会把每项任务输出为带有主管 ID、员工 ID、Skill、工具、项目上下文差量、依赖、文件范围和验收门禁的 `task_packet`。宿主通过 `agent_dispatcher(thread_id, task_packet)` 将任务交给原生 Codex Agent，员工完成后只需回传结论、证据、风险和下一步，主管再统一反馈给用户。
+
 ## 方式 B：一个对话模拟完整流程
 
 当平台不方便创建多个对话时，把 `roles/ceo.md`、`roles/project-manager.md` 和 `roles/worker.md` 作为三个角色段落放进同一系统提示词，并要求模型在每个任务开头输出当前路由。小任务仍走直达员工模式。

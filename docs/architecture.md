@@ -13,6 +13,17 @@
 
 CEO、主管和员工是可组合角色，不要求每个任务都经过全部角色。用任务规模决定流程深度。
 
+## Codex Agent role mapping
+
+MakeCrew maps directly onto the host's native Agent threads:
+
+- `/root` is the current conversation and becomes the CEO layer only for explicit multi-task batches, cross-project decisions, or global resource conflicts.
+- A supervisor Agent is a project-scoped coordinator. It owns decomposition, dependencies, concurrency, employee selection, waiting, conflict resolution, and result synthesis.
+- Each employee Agent is one bounded specialist thread. It receives a task packet with its Skill IDs, tools, project context delta, file scope, budget, and acceptance gates.
+- The QA Agent is an independent verification thread. It consumes employee deltas rather than full histories and reports evidence and unresolved risks back to the supervisor.
+
+The host adapter creates or reuses the actual Codex threads. MakeCrew records the parent supervisor ID, employee Agent ID, thread identity, and structured result contract so the mapping remains inspectable across hosts. Independent write scopes should map to separate Worktrees; overlapping write scopes remain serial.
+
 ## Adaptive lifecycle
 
 There is no mandatory full lifecycle. The router selects the smallest graph
