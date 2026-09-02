@@ -257,6 +257,7 @@ You can bootstrap a workspace and audit host tools:
 makecrew init --path ./my-ai-workspace --project demo
 makecrew audit --tools filesystem,shell,browser,web_search
 makecrew capability-audit
+makecrew codex-audit --supervisor-id PM-001
 ```
 
 For platforms that support skills, use [`skills/makecrew/SKILL.md`](skills/makecrew/SKILL.md) as the standard entry point.
@@ -289,6 +290,17 @@ follow-up work reuses the same project employee conversation before a new one
 is created. Provide a `thread_adapter` to create or look up host conversations;
 the CLI reports `execution: host_adapter_required` rather than pretending to
 run an external Agent by itself.
+
+For Codex, use the bundled `CodexAdapter`: it records the parent Agent as the
+supervisor and each native subagent as an employee. The first dispatch calls
+`spawn_subagent(prompt, metadata)`, follow-up work calls
+`send_to_thread(thread_id, prompt)`, employees write back through
+`adapter.complete(scheduler, task_id, result)`, and the supervisor receives a
+compact delta from `adapter.summarize(scheduler)`. The adapter does not depend
+on a private Codex API; bind these callbacks to the native Agent/thread
+operations exposed by the host. When callbacks are missing it returns `queued`
+with the missing capability instead of claiming execution. See
+[`docs/platform-adapters.md`](docs/platform-adapters.md) for the full example.
 
 ## Runnable MVP
 

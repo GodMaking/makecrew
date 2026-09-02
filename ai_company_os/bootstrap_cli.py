@@ -10,6 +10,7 @@ from .bootstrap import audit_tools, initialize_workspace, install_codex_global_i
 from .orchestrator import CrewOrchestrator
 from .intake import plan_batch, plan_request
 from .batch import BatchScheduler
+from .codex_adapter import CodexAdapter
 from .capabilities import audit_employee_capabilities
 from .rag import RetrievalScope
 from .rag_store import JsonRagIndex, plan_directory
@@ -27,6 +28,11 @@ def main(argv: list[str] | None = None) -> int:
     audit.add_argument("--tools", default="", help="comma-separated available tool names")
 
     capability_audit = subparsers.add_parser("capability-audit", help="audit built-in employee skill bindings")
+
+    codex_audit = subparsers.add_parser("codex-audit", help="audit Codex native Agent adapter wiring")
+    codex_audit.add_argument("--supervisor-id", default="PM-001", help="supervisor Agent ID")
+    codex_audit.add_argument("--supervisor-thread", default="", help="existing supervisor thread ID")
+    codex_audit.add_argument("--max-concurrency", type=int, default=3, help="planned native Agent concurrency")
 
     global_intake = subparsers.add_parser(
         "install-codex-global-intake",
@@ -115,6 +121,11 @@ def main(argv: list[str] | None = None) -> int:
         result = audit_tools([item for item in args.tools.split(",") if item.strip()])
     elif args.command == "capability-audit":
         result = audit_employee_capabilities()
+    elif args.command == "codex-audit":
+        result = CodexAdapter(
+            supervisor_id=args.supervisor_id,
+            supervisor_thread_id=args.supervisor_thread,
+        ).audit(max_concurrency=args.max_concurrency)
     elif args.command == "install-codex-global-intake":
         result = install_codex_global_intake(args.codex_home)
     elif args.command == "rag-init":

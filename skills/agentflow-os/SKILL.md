@@ -54,6 +54,11 @@ parallel work, or needs cross-project resource decisions. Reuse an approved
 employee thread for the same project; propose missing roles first, then dispatch
 independent tasks with explicit dependencies, budgets, and one QA summary.
 
+On Codex, use the bundled `CodexAdapter` to map the parent Agent to the
+supervisor and native child Agents to employees. Host callbacks create/reuse
+threads, send compact packets, and return structured results; missing callbacks
+remain explicitly queued.
+
 ## Verification and learning
 
 Return the route, employee IDs, selected Skills/tools, project context,

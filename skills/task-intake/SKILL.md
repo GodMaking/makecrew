@@ -98,6 +98,11 @@ and acceptance gates, then collect only a structured result (`summary`,
 `evidence`, `risks`, `next_steps`). Use Codex Worktrees for independent writes
 and keep shared-file work serial.
 
+The bundled `CodexAdapter` provides the host bridge for this contract. Bind
+`spawn_subagent` and `send_to_thread` to the native Codex operations, call
+`audit()` before dispatch, and keep the returned `thread_id` in the scheduler
+state for follow-up work.
+
 ## Confirmation rules
 
 Always surface the target and rollback/verification plan before production

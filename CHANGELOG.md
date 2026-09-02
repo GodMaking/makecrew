@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Added
+- Codex 原生 Agent 适配器：将父 Agent 映射为主管、子 Agent 映射为员工，支持线程复用、最小任务包、结构化结果回写和主管汇总。
+- `makecrew codex-audit`：在连接宿主回调前检查主管身份、缺失能力和并发建议。
 - AgentFlow OS 品牌与 AI 可发现性入口：保留 MakeCrew、`makecrew` 命令、Skill ID 和 GitHub 地址作为兼容别名。
 - `task-intake` Skill：单任务在当前对话内完成需求澄清、Skill/工具规划、确认和执行。
 - 单任务方法/Skill 发现阶段，以及验收后的自进化记录、提案和回放契约。

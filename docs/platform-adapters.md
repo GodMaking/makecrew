@@ -6,6 +6,50 @@
 - 将项目上下文包作为项目文件或固定参考资料。
 - 需要真实浏览器、代码仓库、设计或视频操作时，为对应员工启用平台已有工具，并在任务卡写明工具范围。
 
+### Codex 原生 Agent 适配器
+
+MakeCrew 不重新实现 Codex 的 Agent 生命周期。`CodexAdapter` 将父 Agent
+作为主管、每个原生子 Agent 作为员工，并把最小任务包交给宿主回调：
+
+```python
+from ai_company_os import BatchScheduler, CodexAdapter
+
+def spawn_subagent(prompt, metadata):
+    # 用宿主提供的原生子 Agent 创建能力；返回 thread_id 和可选 agent_id
+    return {"status": "accepted", "thread_id": "CODEX_THREAD_ID", "agent_id": metadata["agent_id"]}
+
+def send_to_thread(thread_id, prompt):
+    # 用宿主提供的线程发送能力；不要复制完整历史
+    return {"status": "accepted", "run_id": "CODEX_RUN_ID"}
+
+adapter = CodexAdapter(
+    supervisor_id="PM-001",
+    supervisor_thread_id="CODEX_SUPERVISOR_THREAD",
+    spawn_subagent=spawn_subagent,
+    send_to_thread=send_to_thread,
+)
+scheduler = BatchScheduler(
+    supervisor_id="PM-001",
+    thread_adapter=adapter.open_employee_thread,
+    agent_dispatcher=adapter.dispatch,
+    max_concurrency=3,
+)
+scheduler.add("修复登录页", task_id="T1", project="demo", file_scope=["src/login.tsx"])
+dispatch = scheduler.dispatch_ready()[0]
+# 宿主收到员工 JSON 后：
+adapter.complete(scheduler, "T1", {"summary": "完成", "evidence": ["test.log"]})
+summary = adapter.summarize(scheduler)
+```
+
+`spawn_subagent` 只在该员工没有已注册线程时调用；同一员工/项目/主管的后续
+任务复用线程并通过 `send_to_thread` 发送差量。回调缺失时，适配器返回
+`queued` 及缺失能力名称，不会把计划伪装成已执行。`audit()` 可在启动时检查
+回调是否接通；建议先用 `max_concurrency=3`，再依据宿主限制调整。
+
+也可以先运行 `makecrew codex-audit --supervisor-id PM-001`，查看当前主管
+身份、已接通的宿主回调、缺失项和并发建议。该检查不创建 Agent、不发送消息，
+适合安装或重启后先做一次连接自检。
+
 ## Claude
 
 - 将 CEO 或岗位提示词放入 Project Instructions。

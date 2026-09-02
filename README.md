@@ -372,6 +372,7 @@ RAG 作用域检索、权限边界、引用和宿主向量库接入见 [`docs/ra
 makecrew init --path ./my-ai-workspace --project demo
 makecrew audit --tools filesystem,shell,browser,web_search
 makecrew capability-audit
+makecrew codex-audit --supervisor-id PM-001
 ```
 
 面向支持 Skill 的平台，可读取 [`skills/makecrew/SKILL.md`](skills/makecrew/SKILL.md) 作为标准入口；旧路径 [`skills/agentflow-os/SKILL.md`](skills/agentflow-os/SKILL.md) 继续兼容。
@@ -442,6 +443,14 @@ scheduler = BatchScheduler(thread_adapter=open_thread)
 
 CLI 的 `batch-dispatch` 会输出本批次的 `dispatches` 和
 `execution: host_adapter_required`；真实 Agent 创建、消息发送和结果回写由适配器负责。
+
+Codex 优先使用仓库内的 `CodexAdapter`：它把父 Agent 记录为主管，把每个
+原生子 Agent 记录为员工，首次派发调用 `spawn_subagent(prompt, metadata)`，
+后续任务调用 `send_to_thread(thread_id, prompt)`，员工完成后用
+`adapter.complete(scheduler, task_id, result)` 回写，主管用
+`adapter.summarize(scheduler)` 接收紧凑差量。适配器不依赖私有 Codex API，
+由宿主把这两个回调绑定到当前可用的原生 Agent/线程操作；回调未接通时会
+明确返回 `queued` 和缺失项。完整代码见 [`docs/platform-adapters.md`](docs/platform-adapters.md)。
 
 ## 路由规则
 

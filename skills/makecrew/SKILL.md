@@ -86,6 +86,13 @@ Codex Agent. Employees return only `summary`, `evidence`, `risks`, and
 `next_steps`; the supervisor uses `aggregate_results()` to synthesize the
 user-facing update.
 
+For a concrete Codex host bridge, use `CodexAdapter`: bind its
+`spawn_subagent(prompt, metadata)` and `send_to_thread(thread_id, prompt)`
+callbacks, pass `open_employee_thread` and `dispatch` to `BatchScheduler`, and
+write employee results back with `complete()`. Call `audit()` before starting a
+batch. A missing callback leaves work in `queued` state with the exact missing
+capability; it never claims that a native Agent was created.
+
 ## Learning loop
 
 On negative feedback, failed verification, rework, repeated issues, or an

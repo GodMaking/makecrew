@@ -278,27 +278,42 @@ class BatchScheduler:
         dispatched: list[dict[str, Any]] = []
         for item in self.ready():
             task_id = item["task_id"]
-            record = self.mark_running(task_id)
+            self.mark_running(task_id)
+            # ``mark_running`` returns a defensive snapshot; continue with the
+            # live record so host-created thread IDs and dispatch receipts are
+            # retained for resume and follow-up work.
+            record = self._get(task_id)
             thread_id = ""
             reused = False
-            if self.thread_adapter is not None:
-                scope = record["task_id"] if record.get("isolated_thread") else "shared"
-                key = (record["employee_id"], record["project"], f"{record.get('supervisor_id', '')}:{scope}")
-                if key in self._threads:
-                    thread_id = self._threads[key]
+            thread_key = None if record.get("isolated_thread") else (
+                record["employee_id"],
+                record["project"],
+                f"{record.get('supervisor_id', '')}:shared",
+            )
+            if self.thread_adapter is not None and thread_key is not None:
+                if thread_key in self._threads:
+                    thread_id = self._threads[thread_key]
                     reused = True
                 else:
                     response = self.thread_adapter(record["employee_id"], record["project"], record["role"])
                     thread_id = str(response.get("thread_id", ""))
                     reused = bool(response.get("reused", False))
                     if thread_id:
-                        self._threads[key] = thread_id
+                        self._threads[thread_key] = thread_id
             record["thread_id"] = thread_id
             record["thread_reused"] = reused
             host_dispatch = None
             if self.agent_dispatcher is not None:
                 response = self.agent_dispatcher(thread_id, record["task_packet"])
                 host_dispatch = response if isinstance(response, dict) else {"status": "accepted", "result": response}
+                if str(host_dispatch.get("status", "")).lower() in {"queued", "blocked", "waiting"}:
+                    record["status"] = "waiting_host"
+                dispatched_thread_id = str(host_dispatch.get("thread_id", "")).strip()
+                if dispatched_thread_id and not record["thread_id"]:
+                    record["thread_id"] = dispatched_thread_id
+                    record["thread_reused"] = bool(host_dispatch.get("reused", False))
+                    if thread_key is not None:
+                        self._threads[thread_key] = dispatched_thread_id
             dispatched.append({
                 "task_id": task_id,
                 "employee_id": record["employee_id"],
@@ -309,11 +324,11 @@ class BatchScheduler:
                     "agent_kind": record["supervisor_kind"],
                     "role": record["supervisor_role"],
                 },
-                "thread_id": thread_id,
-                "thread_reused": reused,
+                "thread_id": record["thread_id"],
+                "thread_reused": record["thread_reused"],
                 "task_packet": record["task_packet"],
                 "host_dispatch": host_dispatch,
-                "status": "running",
+                "status": record["status"],
             })
         return dispatched
 
@@ -341,7 +356,7 @@ class BatchScheduler:
         usage: dict[str, int] | None = None,
     ) -> dict[str, Any]:
         record = self._get(task_id)
-        if record["status"] not in {"pending", "running", "review"}:
+        if record["status"] not in {"pending", "running", "review", "waiting_host"}:
             raise ValueError(f"当前状态不可标记完成：{task_id}")
         if record["status"] == "cancelled":
             raise ValueError(f"任务已取消：{task_id}")
@@ -357,7 +372,7 @@ class BatchScheduler:
     def mark_failed(self, task_id: str, *, reason: str = "", usage: dict[str, int] | None = None) -> dict[str, Any]:
         """Finish a task as failed while keeping a compact, actionable reason."""
         record = self._get(task_id)
-        if record["status"] not in {"pending", "running", "review", "paused"}:
+        if record["status"] not in {"pending", "running", "review", "paused", "waiting_host"}:
             raise ValueError(f"当前状态不可标记失败：{task_id}")
         if record["status"] in TERMINAL:
             return self.snapshot(task_id)
