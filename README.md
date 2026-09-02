@@ -375,6 +375,30 @@ makecrew capability-audit
 makecrew codex-audit --supervisor-id PM-001
 ```
 
+### P0 质量与恢复工具
+
+除了路由和批次调度，仓库还提供三个轻量、可选的运行契约，适合在宿主
+平台接入后逐步启用：
+
+```bash
+# 检查每个 Skill 的 frontmatter、命名、目录和渐进披露结构
+makecrew skill-audit --path skills
+
+# 检查 Codex 主管身份、原生 Agent 回调和并发建议
+makecrew codex-audit --supervisor-id PM-001
+```
+
+- `skill-audit` 在发布或更新 Skill 前发现元数据、目录和资源布局问题，
+  不读取无关正文，也不会替换现有 Skill。
+- `review-and-critique` 只在开发里程碑、合并前或发布前启动独立审查，
+  输出严重程度、文件证据、修复建议和复核状态；普通查询不会增加这轮成本。
+- `checkpoint-recovery` 让宿主在工作流节点边界保存紧凑状态和幂等键，
+  重启后从最近检查点继续；有界重试不会重复已经完成的副作用。
+
+这三个机制都是宿主可选适配器，不改变单任务短路径，也不要求安装第三方
+运行时。没有接入真实宿主回调时，命令和调度器会明确报告检查结果或
+`queued` 状态，不把计划冒充成已执行。
+
 面向支持 Skill 的平台，可读取 [`skills/makecrew/SKILL.md`](skills/makecrew/SKILL.md) 作为标准入口；旧路径 [`skills/agentflow-os/SKILL.md`](skills/agentflow-os/SKILL.md) 继续兼容。
 
 岗位与 Skill 的完整对应关系见 [`docs/capability-matrix.md`](docs/capability-matrix.md)。运行 `makecrew capability-audit` 可检查所有内置员工的 Skill 文件是否齐全；初始化已有工作区时只增量补写缺失的 `skill_ids`，不会覆盖既有员工配置。
@@ -415,6 +439,8 @@ python -m ai_company_os.web
 - `ai_company_os.discovery.resolve_skills()`：先匹配已安装 Skill，再为缺失能力搜索候选并生成用户选择状态
 - `ai_company_os.intake.plan_batch()`：多任务 CEO 批量调度方案
 - `ai_company_os.batch.BatchScheduler`：依赖图、并发上限、批次/单任务工具预算、暂停恢复、取消、失败记录和员工线程复用
+- `ai_company_os.skill_audit.audit_skill_directory()`：批量检查 Skill 元数据、命名、目录一致性和渐进披露目录
+- `ai_company_os.checkpoint.JsonCheckpointStore` / `RetryPolicy`：持久化紧凑检查点、幂等保存和有界恢复重试
 
 ### 当前能力边界
 

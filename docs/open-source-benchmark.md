@@ -25,6 +25,9 @@ MakeCrew 选择做一层跨平台的任务入口和协调契约，而不是替�
 | [MetaGPT](https://github.com/FoundationAgents/MetaGPT) | 软件公司角色、SOP、阶段产物和协作 | 岗位能力契约、阶段产物、验收标准 | MakeCrew 不限定软件开发领域 |
 | [sickn33/agentic-awesome-skills](https://github.com/sickn33/agentic-awesome-skills) | 大规模目录、发现、规划和本地控制面 | Skill 目录审计、候选来源、可解释选择和能力缺口 | 不把数千 Skill 默认加载进上下文 |
 | [dsifry/metaswarm](https://github.com/dsifry/metaswarm) | 多 Agent、命令入口、TDD、质量门禁、任务追踪和自我改进 | 任务台账、预算、验收、回放和事件触发自进化 | 不预置固定 18 人团队或特定 CLI |
+| [obra/superpowers](https://github.com/obra/superpowers/tree/main/skills/requesting-code-review) | 里程碑代码审查、按严重程度阻断合并、独立上下文审查 | `review-and-critique`：开发里程碑和发布前按需触发 | 不把审查套在普通查询上 |
+| [agentskills.io](https://agentskills.io/specification) | Skill 元数据约束、命名校验、兼容性和渐进披露 | `skill-audit`：本地目录结构与 frontmatter 审计 | 不静默安装或替换 Skill |
+| [LangGraph durable execution](https://langchain-ai.github.io/langgraph/concepts/durable_execution/) | 持久检查点、幂等恢复和中断后继续 | `checkpoint-recovery`：可选宿主契约和有界重试 | 不引入 LangGraph 运行时依赖 |
 
 ## 已落地机制
 
@@ -34,6 +37,7 @@ MakeCrew 选择做一层跨平台的任务入口和协调契约，而不是替�
 4. Skill 元数据和完整指令分离；任务只加载所需内容，资源由 Skill 自己声明并按需读取。
 5. 单任务在当前对话内完成；明确多任务才进入 CEO 批次；并发、依赖、预算和恢复均可检查。
 6. 输出有独立验收、证据、失败原因和回放评分；自进化提案不能绕过审阅直接修改 Skill。
+7. P0 机制以可选方式落地：Skill 目录审计、里程碑审查、持久检查点与有界重试，不改变单任务短路径。
 
 ## 后续优先级
 

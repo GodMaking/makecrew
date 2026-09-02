@@ -17,6 +17,7 @@ BUNDLED_SKILLS = (
     "source-driven-development", "frontend-ui-engineering", "api-and-interface-design",
     "git-workflow-and-versioning", "ci-cd-and-automation", "shipping-and-launch",
     "debugging-and-error-recovery", "context-engineering", "self-evolution",
+    "review-and-critique", "skill-audit", "checkpoint-recovery",
     "product-delivery",
 )
 
@@ -99,6 +100,24 @@ UPSTREAM_SOURCES: dict[str, dict[str, str]] = {
         "license": "MIT",
         "reason": "按需加载上下文，控制 Token",
     },
+    "review-and-critique": {
+        "repository": "obra/superpowers",
+        "url": "https://github.com/obra/superpowers/tree/main/skills/requesting-code-review",
+        "license": "MIT",
+        "reason": "在关键开发节点进行独立代码审查",
+    },
+    "skill-audit": {
+        "repository": "agentskills/agentskills",
+        "url": "https://agentskills.io/specification",
+        "license": "Apache-2.0",
+        "reason": "校验 Skill 元数据、命名和渐进披露结构",
+    },
+    "checkpoint-recovery": {
+        "repository": "langchain-ai/langgraph",
+        "url": "https://langchain-ai.github.io/langgraph/concepts/durable_execution/",
+        "license": "MIT",
+        "reason": "从持久检查点恢复并对失败执行有限重试",
+    },
 }
 
 
@@ -109,17 +128,17 @@ EMPLOYEE_SKILL_MATRIX: dict[str, tuple[str, ...]] = {
     ),
     "PM-001": (
         "makecrew", "task-intake", "planning-and-task-breakdown", "parallel-dispatch",
-        "context-engineering", "verification-before-completion", "self-evolution",
+        "context-engineering", "checkpoint-recovery", "verification-before-completion", "self-evolution",
     ),
     "QA-001": (
         "makecrew", "task-intake", "verification-before-completion", "test-driven-development",
-        "debugging-and-error-recovery", "context-engineering", "self-evolution",
+        "debugging-and-error-recovery", "review-and-critique", "checkpoint-recovery", "context-engineering", "self-evolution",
     ),
     "ENG-001": (
         "task-intake", "test-driven-development", "debugging-and-error-recovery",
         "frontend-ui-engineering", "api-and-interface-design", "git-workflow-and-versioning",
         "ci-cd-and-automation", "shipping-and-launch", "product-delivery",
-        "context-engineering", "self-evolution",
+        "review-and-critique", "checkpoint-recovery", "context-engineering", "self-evolution",
     ),
     "RES-001": (
         "task-intake", "source-driven-development", "context-engineering",
@@ -139,7 +158,7 @@ EMPLOYEE_SKILL_MATRIX: dict[str, tuple[str, ...]] = {
     ),
     "SKL-001": (
         "makecrew", "task-intake", "interview-me", "context-engineering",
-        "verification-before-completion", "self-evolution",
+        "skill-audit", "verification-before-completion", "self-evolution",
     ),
 }
 

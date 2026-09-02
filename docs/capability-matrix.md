@@ -10,14 +10,14 @@ upgrade.
 | Employee | Focus | Required skill groups |
 |---|---|---|
 | `CEO-001` | Cross-project goals and resource decisions | intake, interview, planning, context, verification, self-evolution |
-| `PM-001` | Project decomposition and coordination | intake, planning, parallel dispatch, context, verification, self-evolution |
-| `QA-001` | Independent acceptance | intake, verification, TDD, debugging, context, self-evolution |
-| `ENG-001` | Engineering delivery | intake, product delivery, TDD, debugging, frontend, API, Git, CI/CD, launch, context, self-evolution |
+| `PM-001` | Project decomposition and coordination | intake, planning, parallel dispatch, context, checkpoint recovery, verification, self-evolution |
+| `QA-001` | Independent acceptance | intake, verification, TDD, debugging, review, checkpoint recovery, context, self-evolution |
+| `ENG-001` | Engineering delivery | intake, product delivery, TDD, debugging, frontend, API, Git, CI/CD, launch, review, checkpoint recovery, context, self-evolution |
 | `RES-001` | Research and evidence | intake, source-driven research, context, verification, self-evolution |
 | `CON-001` | Content and copy | intake, interview, source-driven research, context, verification, self-evolution |
 | `DES-001` | UI and visual delivery | intake, frontend UI, context, verification, self-evolution |
 | `KNO-001` | Knowledge-base processing | intake, source-driven research, context, verification, self-evolution |
-| `SKL-001` | Skill creation and maintenance | MakeCrew, intake, interview, context, verification, self-evolution |
+| `SKL-001` | Skill creation and maintenance | MakeCrew, intake, interview, Skill audit, context, verification, self-evolution |
 
 The local `skills/` directory contains portable adapters for every ID in the
 matrix. They are deliberately short: the host platform can substitute a

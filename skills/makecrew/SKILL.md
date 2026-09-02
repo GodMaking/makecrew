@@ -76,6 +76,24 @@ opening a conversation. `pause`, `resume`, `cancel`, and `mark_failed` preserve
 state and reasons. The scheduler is a queue/state kernel; the host adapter must
 perform actual conversation creation and tool execution.
 
+## Quality and recovery contracts
+
+Use the optional P0 contracts at the boundary where they add evidence:
+
+- run `makecrew skill-audit --path SKILLS_DIR` before publishing or updating a
+  Skill; inspect metadata and progressive-disclosure layout without loading
+  unrelated resources;
+- invoke `review-and-critique` at meaningful development milestones, before a
+  merge, or before a release; keep routine queries on the short path;
+- use `checkpoint-recovery` (or an equivalent host adapter) at workflow node
+  boundaries so restart resumes compact state through an idempotency key and
+  bounded retry policy.
+
+Keep `task_id`, `node_id`, `idempotency_key`, `resume_from`, evidence, and the
+failure reason in adapter results. These contracts supplement the scheduler;
+they do not create employees, add a mandatory review round, or claim host
+execution when callbacks are not connected.
+
 Codex role mapping is direct: the parent/supervisor Agent manages the batch,
 each Codex subagent is one MakeCrew employee, and the QA Agent independently
 verifies the results. `BatchScheduler.supervisor_id` records the parent Agent;

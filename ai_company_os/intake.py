@@ -36,6 +36,9 @@ DISCOVERY_HINTS = (
     "搜索", "搜一下", "查找", "调研", "研究", "比较", "对比",
     "推荐", "最佳", "最适合", "方法", "skill", "插件", "开源实现", "借鉴",
 )
+REVIEW_HINTS = (
+    "代码审查", "代码评审", "review", "合并前", "上线前检查", "发布前检查",
+)
 LEARNING_HINTS = (
     "差评", "不合格", "返工", "失败", "重复问题", "复盘", "训练员工",
     "效果差", "没做好", "又错", "垃圾",
@@ -159,6 +162,12 @@ def _skills_for(domains: list[str], task: str) -> list[str]:
         skills.append("git-workflow-and-versioning")
     if "skill" in normalized and "技能" in domains:
         skills.append("skill-creator")
+    if any(hint in normalized for hint in REVIEW_HINTS):
+        skills.append("review-and-critique")
+    if any(word in normalized for word in ("恢复", "重启后", "断点", "检查点", "重试")):
+        skills.append("checkpoint-recovery")
+    if any(word in normalized for word in ("skill", "技能", "安装能力", "技能包")):
+        skills.append("skill-audit")
     return list(dict.fromkeys(skills))
 
 

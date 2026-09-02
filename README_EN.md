@@ -260,6 +260,33 @@ makecrew capability-audit
 makecrew codex-audit --supervisor-id PM-001
 ```
 
+### P0 quality and recovery tools
+
+The repository also includes three lightweight, optional contracts that can be
+enabled incrementally when a host adapter is available:
+
+```bash
+# Check Skill frontmatter, naming, directory consistency, and disclosure layout
+makecrew skill-audit --path skills
+
+# Check Codex supervisor identity, native Agent callbacks, and concurrency advice
+makecrew codex-audit --supervisor-id PM-001
+```
+
+- `skill-audit` catches metadata, directory, and resource-layout issues before a
+  Skill is published or updated. It does not replace an existing Skill.
+- `review-and-critique` runs an independent review at development milestones,
+  before merge, or before release. It reports severity, file evidence, fixes,
+  and recheck status; routine queries skip this cost.
+- `checkpoint-recovery` lets a host persist compact node state and idempotency
+  keys, resume after restart, and retry only bounded, explicitly retryable
+  failures without repeating completed side effects.
+
+These are optional host adapters. They preserve the shortest single-task path
+and do not require a third-party runtime. When native host callbacks are not
+connected, the CLI and scheduler report the inspection result or `queued`
+state instead of claiming that external execution occurred.
+
 For platforms that support skills, use [`skills/makecrew/SKILL.md`](skills/makecrew/SKILL.md) as the standard entry point.
 
 See [`docs/capability-matrix.md`](docs/capability-matrix.md) for the complete
@@ -312,3 +339,9 @@ python -m ai_company_os.web
 ```
 
 Open `http://127.0.0.1:8787` for the local demo. The router returns a serializable collaboration plan without uploading task text or requiring an API key.
+
+The Python API for the P0 contracts is:
+
+- `ai_company_os.skill_audit.audit_skill_directory()` for structural Skill audits;
+- `ai_company_os.checkpoint.JsonCheckpointStore` for compact durable checkpoints;
+- `ai_company_os.checkpoint.RetryPolicy` for bounded retry and resume decisions.

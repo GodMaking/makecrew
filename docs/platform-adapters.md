@@ -103,3 +103,13 @@ def open_thread(employee_id, project, role):
 ## 工具与 Skill 配置原则
 
 按岗位配置能力，而不是把所有工具塞给每个员工：开发员工配置代码、测试和部署工具；研究员工配置搜索、文档和引用工具；内容员工配置文案、图像和视频工具；Skill 员工配置文件系统、搜索和 Skill 加载/验证能力。变更工具前先记录版本和回滚方法。
+
+## P0 机制适配器
+
+MakeCrew 提供三个可选的轻量契约，不改变现有单任务路径：
+
+- `skill-audit` / `audit_skill_directory()`：启动或更新 Skill 时检查 `SKILL.md` 的名称、描述、目录一致性和 `references/`、`scripts/`、`assets/` 渐进披露目录。运行 `makecrew skill-audit --path SKILLS_DIR`。
+- `review-and-critique`：开发里程碑、合并前或发布前接入独立审查器；普通查询跳过。审查结果必须包含严重程度、文件证据、修复建议和复核状态。
+- `checkpoint-recovery` / `JsonCheckpointStore`：宿主在节点边界保存紧凑状态和幂等键，重启后读取最新节点；`RetryPolicy` 只允许有界、可重试失败从最近检查点继续。
+
+宿主接入时可替换存储和审查实现，但应保留 `task_id`、`node_id`、`idempotency_key`、`resume_from` 和失败原因字段，避免把“已生成计划”误报为已执行。

@@ -59,6 +59,15 @@ supervisor and native child Agents to employees. Host callbacks create/reuse
 threads, send compact packets, and return structured results; missing callbacks
 remain explicitly queued.
 
+## P0 quality and recovery
+
+The compatibility entry also exposes three optional contracts from MakeCrew:
+`skill-audit` validates Skill metadata and progressive-disclosure layout;
+`review-and-critique` supplies milestone and pre-release independent review;
+`checkpoint-recovery` persists compact, idempotent node state and bounded retry
+decisions. Add them only when the task needs those guarantees, keeping ordinary
+single-task work on the shortest path.
+
 ## Verification and learning
 
 Return the route, employee IDs, selected Skills/tools, project context,

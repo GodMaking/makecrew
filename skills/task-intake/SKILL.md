@@ -61,6 +61,14 @@ separate employee conversation for an ordinary single task.
 8. Trigger learning only after negative feedback, failed verification, rework,
    repeated issues, or an explicit retrospective request.
 
+At a meaningful development milestone, before merge/release, or when a user
+requests an independent check, add `review-and-critique` and require findings
+with severity, file evidence, a concrete fix, and recheck status. For work that
+may be interrupted or retried, add `checkpoint-recovery` at node boundaries;
+persist compact state and an idempotency key, then resume from the latest
+checkpoint with a bounded retry policy. These are conditional nodes, not part
+of every routine task.
+
 For a new or substantially redesigned website, app, product, or multi-stage
 feature, select `product-delivery` after intake. It adds a project brief,
 prototype/demo, technical design, and implementation gate; small maintenance

@@ -12,6 +12,7 @@ from .intake import plan_batch, plan_request
 from .batch import BatchScheduler
 from .codex_adapter import CodexAdapter
 from .capabilities import audit_employee_capabilities
+from .skill_audit import audit_skill_directory
 from .rag import RetrievalScope
 from .rag_store import JsonRagIndex, plan_directory
 
@@ -28,6 +29,9 @@ def main(argv: list[str] | None = None) -> int:
     audit.add_argument("--tools", default="", help="comma-separated available tool names")
 
     capability_audit = subparsers.add_parser("capability-audit", help="audit built-in employee skill bindings")
+
+    skill_audit = subparsers.add_parser("skill-audit", help="validate local SKILL.md metadata and layout")
+    skill_audit.add_argument("--path", default="skills", help="directory containing one subdirectory per Skill")
 
     codex_audit = subparsers.add_parser("codex-audit", help="audit Codex native Agent adapter wiring")
     codex_audit.add_argument("--supervisor-id", default="PM-001", help="supervisor Agent ID")
@@ -121,6 +125,8 @@ def main(argv: list[str] | None = None) -> int:
         result = audit_tools([item for item in args.tools.split(",") if item.strip()])
     elif args.command == "capability-audit":
         result = audit_employee_capabilities()
+    elif args.command == "skill-audit":
+        result = audit_skill_directory(args.path)
     elif args.command == "codex-audit":
         result = CodexAdapter(
             supervisor_id=args.supervisor_id,
