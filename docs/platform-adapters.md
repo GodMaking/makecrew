@@ -109,6 +109,7 @@ def open_thread(employee_id, project, role):
 MakeCrew 提供三个可选的轻量契约，不改变现有单任务路径：
 
 - `skill-audit` / `audit_skill_directory()`：启动或更新 Skill 时检查 `SKILL.md` 的名称、描述、目录一致性和 `references/`、`scripts/`、`assets/` 渐进披露目录。运行 `makecrew skill-audit --path SKILLS_DIR`。
+- `skill-inventory` / `inventory_skill_directory()`：仅返回 Skill 名称、描述、路径、状态和资源布局，供宿主路由；指令正文、引用和脚本按匹配结果再加载。运行 `makecrew skill-inventory --path SKILLS_DIR`。
 - `review-and-critique`：开发里程碑、合并前或发布前接入独立审查器；普通查询跳过。审查结果必须包含严重程度、文件证据、修复建议和复核状态。
 - `checkpoint-recovery` / `JsonCheckpointStore`：宿主在节点边界保存紧凑状态和幂等键，重启后读取最新节点；`RetryPolicy` 只允许有界、可重试失败从最近检查点继续。
 

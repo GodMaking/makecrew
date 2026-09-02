@@ -83,6 +83,8 @@ Use the optional P0 contracts at the boundary where they add evidence:
 - run `makecrew skill-audit --path SKILLS_DIR` before publishing or updating a
   Skill; inspect metadata and progressive-disclosure layout without loading
   unrelated resources;
+- run `makecrew skill-inventory --path SKILLS_DIR` when the host needs a
+  metadata-only local capability list; load matched instructions later;
 - invoke `review-and-critique` at meaningful development milestones, before a
   merge, or before a release; keep routine queries on the short path;
 - use `checkpoint-recovery` (or an equivalent host adapter) at workflow node

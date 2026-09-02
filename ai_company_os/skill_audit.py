@@ -110,3 +110,41 @@ def audit_skill_directory(root: str | Path) -> dict[str, Any]:
         "status": "pass" if pass_count == len(reports) else "review",
         "skills": reports,
     }
+
+
+def inventory_skill_directory(root: str | Path) -> dict[str, Any]:
+    """Return a metadata-only local Skill inventory for host adapters.
+
+    The inventory deliberately reuses the structural audit and never loads the
+    instruction body, references, scripts, or assets. Only passing entries are
+    advertised as ready for matching; entries needing review remain visible so
+    a host can report the exact path and issue instead of silently ignoring it.
+    """
+    audit = audit_skill_directory(root)
+    skills = [
+        {
+            "skill_id": report["skill_id"],
+            "name": report["metadata"]["name"],
+            "description": report["metadata"]["description"],
+            "path": report["path"],
+            "status": report["status"],
+            "progressive_disclosure": dict(report["progressive_disclosure"]),
+            "issues": list(report["issues"]),
+        }
+        for report in audit["skills"]
+    ]
+    return {
+        "root": audit["root"],
+        "status": "ready" if audit["status"] == "pass" else "review_required",
+        "skill_count": audit["skill_count"],
+        "ready_count": audit["pass_count"],
+        "review_count": audit["review_count"],
+        "ready_skill_ids": [item["skill_id"] for item in skills if item["status"] == "pass"],
+        "review_skill_ids": [item["skill_id"] for item in skills if item["status"] != "pass"],
+        "skills": skills,
+        "load_policy": {
+            "metadata": "loaded",
+            "instructions": "load_after_match",
+            "references_and_scripts": "load_on_demand",
+        },
+    }

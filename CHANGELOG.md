@@ -15,6 +15,7 @@
 - `skill-audit`：在发布或更新前审计 Skill 元数据、命名、目录一致性和渐进披露布局。
 - `review-and-critique`：在开发里程碑、合并前和发布前提供带文件证据的独立审查契约。
 - `checkpoint-recovery`：提供紧凑检查点、幂等保存和有界失败重试，支持宿主在重启后继续任务。
+- `skill-inventory`：只读取本地 Skill 元数据和状态，供宿主路由匹配并按需加载正文。
 
 ### Changed
 - 项目对外品牌由 MakeCrew 更新为 AgentFlow OS（智流工作系统），突出自适应需求入口、Skill 发现、Agent 路由和可验收执行。

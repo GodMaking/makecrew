@@ -269,12 +269,18 @@ enabled incrementally when a host adapter is available:
 # Check Skill frontmatter, naming, directory consistency, and disclosure layout
 makecrew skill-audit --path skills
 
+# List local Skill metadata for routing without loading instruction bodies
+makecrew skill-inventory --path skills
+
 # Check Codex supervisor identity, native Agent callbacks, and concurrency advice
 makecrew codex-audit --supervisor-id PM-001
 ```
 
 - `skill-audit` catches metadata, directory, and resource-layout issues before a
   Skill is published or updated. It does not replace an existing Skill.
+- `skill-inventory` returns names, descriptions, paths, and status for routing;
+  instructions load only after a match, while invalid entries remain visible
+  as review items.
 - `review-and-critique` runs an independent review at development milestones,
   before merge, or before release. It reports severity, file evidence, fixes,
   and recheck status; routine queries skip this cost.

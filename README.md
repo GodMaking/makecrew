@@ -384,12 +384,17 @@ makecrew codex-audit --supervisor-id PM-001
 # 检查每个 Skill 的 frontmatter、命名、目录和渐进披露结构
 makecrew skill-audit --path skills
 
+# 只列出本地 Skill 元数据，供任务路由匹配（不读取正文）
+makecrew skill-inventory --path skills
+
 # 检查 Codex 主管身份、原生 Agent 回调和并发建议
 makecrew codex-audit --supervisor-id PM-001
 ```
 
 - `skill-audit` 在发布或更新 Skill 前发现元数据、目录和资源布局问题，
   不读取无关正文，也不会替换现有 Skill。
+- `skill-inventory` 给宿主返回名称、描述、路径和状态，匹配完成后才加载
+  指令；有问题的 Skill 会保留在清单中并标注待审查。
 - `review-and-critique` 只在开发里程碑、合并前或发布前启动独立审查，
   输出严重程度、文件证据、修复建议和复核状态；普通查询不会增加这轮成本。
 - `checkpoint-recovery` 让宿主在工作流节点边界保存紧凑状态和幂等键，

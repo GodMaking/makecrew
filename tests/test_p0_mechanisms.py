@@ -1,11 +1,14 @@
 import json
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 
+from ai_company_os.bootstrap_cli import main
 from ai_company_os.capabilities import audit_employee_capabilities
 from ai_company_os.checkpoint import JsonCheckpointStore, RetryPolicy
-from ai_company_os.skill_audit import audit_skill_directory, audit_skill_file
+from ai_company_os.skill_audit import audit_skill_directory, audit_skill_file, inventory_skill_directory
 
 
 class SkillAuditTests(unittest.TestCase):
@@ -51,6 +54,40 @@ class SkillAuditTests(unittest.TestCase):
             issue_codes = {issue["code"] for issue in invalid_report["issues"]}
             self.assertIn("invalid_name", issue_codes)
             self.assertIn("missing_description", issue_codes)
+
+    def test_inventory_exposes_metadata_without_loading_skill_body(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "skills" / "demo-skill"
+            root.mkdir(parents=True)
+            (root / "SKILL.md").write_text(
+                "---\nname: demo-skill\ndescription: A metadata-only test.\n---\n"
+                "SECRET_INSTRUCTION_BODY\n",
+                encoding="utf-8",
+            )
+
+            inventory = inventory_skill_directory(root.parent)
+
+            self.assertEqual(inventory["status"], "ready")
+            self.assertEqual(inventory["ready_skill_ids"], ["demo-skill"])
+            self.assertEqual(inventory["skills"][0]["description"], "A metadata-only test.")
+            self.assertNotIn("SECRET_INSTRUCTION_BODY", json.dumps(inventory, ensure_ascii=False))
+            self.assertEqual(inventory["load_policy"]["instructions"], "load_after_match")
+
+    def test_skill_inventory_cli_returns_machine_readable_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "skills" / "demo-skill"
+            root.mkdir(parents=True)
+            (root / "SKILL.md").write_text(
+                "---\nname: demo-skill\ndescription: A CLI inventory test.\n---\nbody\n",
+                encoding="utf-8",
+            )
+            output = StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["skill-inventory", "--path", str(root.parent)])
+
+            self.assertEqual(exit_code, 0)
+            payload = json.loads(output.getvalue())
+            self.assertEqual(payload["ready_skill_ids"], ["demo-skill"])
 
 
 class CheckpointTests(unittest.TestCase):
