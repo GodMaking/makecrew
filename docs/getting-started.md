@@ -58,6 +58,22 @@ makecrew install-codex-global-intake --codex-home CODEX_HOME
 宿主应先澄清并展示 Skills、工具、流程、验收标准、成本和风险，等用户确认后再执行；
 简单查询、读取和状态检查保持直达。
 
+### 安装后检查真实接入状态
+
+不要只根据“安装成功”判断所有能力都已接通。运行：
+
+```bash
+makecrew doctor --path ./my-ai-workspace \
+  --codex-home CODEX_HOME --skills-path SKILLS_PATH
+```
+
+该命令会检查本地元数据、全局入口、Skill 和方法目录、岗位能力、Codex 回调以及可选 RAG 索引。
+它是低副作用检查：缺失时只初始化最小 `.makecrew` 元数据，不安装 Skill、不创建员工或对话、不修改
+全局 `AGENTS.md`。状态含义：`pass` 是静态检查通过；`missing`/`not_configured` 是尚未配置；
+`pending_host_adapter` 是宿主还没绑定真实 Agent/线程回调；`connected` 仍需真实任务验证；
+`runtime_probe: not_run` 表示还没有端到端探测证据。接入完成后，执行一次清晰单任务和一次多任务批次，
+把文件、测试或宿主回执保存到验收记录中。
+
 ## 运行本地 MVP
 
 需要 Python 3.10 或更高版本。直接在仓库目录运行：

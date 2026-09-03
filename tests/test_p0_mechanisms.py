@@ -6,12 +6,78 @@ from io import StringIO
 from pathlib import Path
 
 from ai_company_os.bootstrap_cli import main
+from ai_company_os.bootstrap import doctor_workspace
 from ai_company_os.capabilities import audit_employee_capabilities
 from ai_company_os.checkpoint import JsonCheckpointStore, RetryPolicy
 from ai_company_os.skill_audit import audit_skill_directory, audit_skill_file, inventory_skill_directory
 
 
 class SkillAuditTests(unittest.TestCase):
+    def test_doctor_reports_host_boundary_without_mutating_workspace(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory) / "workspace"
+            codex_home = Path(directory) / "codex"
+            skills = Path(directory) / "skills"
+            initialize = doctor_workspace(workspace, codex_home=codex_home, skills_path=skills)
+
+            self.assertEqual(initialize["status"], "review")
+            self.assertEqual(initialize["workspace"]["employee_count"], 0)
+            self.assertEqual(initialize["global_intake"]["status"], "missing")
+            self.assertEqual(initialize["codex"]["status"], "pending_host_adapter")
+            self.assertEqual(initialize["rag"]["status"], "not_configured")
+            self.assertEqual(initialize["methods"]["status"], "pass")
+            self.assertFalse((codex_home / "AGENTS.md").exists())
+            self.assertTrue((workspace / ".makecrew" / "employee-registry.json").exists())
+
+    def test_doctor_cli_can_run_without_writing_global_intake(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory) / "workspace"
+            codex_home = Path(directory) / "codex"
+            skills = Path(directory) / "skills"
+            output = StringIO()
+            with redirect_stdout(output):
+                exit_code = main([
+                    "doctor", "--path", str(workspace), "--codex-home", str(codex_home),
+                    "--skills-path", str(skills),
+                ])
+
+            self.assertEqual(exit_code, 0)
+            payload = json.loads(output.getvalue())
+            self.assertEqual(payload["global_intake"]["status"], "missing")
+            self.assertFalse((codex_home / "AGENTS.md").exists())
+
+    def test_doctor_reports_malformed_registry_instead_of_crashing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory) / "workspace"
+            registry = workspace / ".makecrew" / "employee-registry.json"
+            registry.parent.mkdir(parents=True)
+            registry.write_text("{broken", encoding="utf-8")
+
+            report = doctor_workspace(workspace, codex_home=Path(directory) / "codex")
+
+            self.assertEqual(report["workspace"]["status"], "review")
+            self.assertIn("JSON", report["workspace"]["error"])
+            self.assertEqual(report["mutations"]["employees_created"], 0)
+
+    def test_doctor_audits_an_existing_skill_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory) / "workspace"
+            skills = workspace / "skills" / "demo-skill"
+            skills.mkdir(parents=True)
+            (skills / "SKILL.md").write_text(
+                "---\nname: demo-skill\ndescription: A doctor test skill.\n---\nbody\n",
+                encoding="utf-8",
+            )
+
+            report = doctor_workspace(
+                workspace,
+                codex_home=Path(directory) / "codex",
+                skills_path=skills.parent,
+            )
+
+            self.assertEqual(report["skills"]["status"], "pass")
+            self.assertEqual(report["skills"]["skill_count"], 1)
+
     def test_valid_skill_has_required_metadata_and_progressive_layout(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "skills" / "demo-skill"

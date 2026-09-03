@@ -8,6 +8,7 @@ import shutil
 
 from .router import CORE_EMPLOYEE_PROFILES, EMPLOYEE_PROFILES, EmployeeProfile
 from .capabilities import skill_ids_for_employee
+from .skill_audit import audit_skill_directory
 
 
 KNOWN_TOOLS = (
@@ -104,6 +105,196 @@ def audit_tools(available: list[str] | tuple[str, ...] | set[str]) -> dict[str, 
         "required": required,
         "missing": [tool for tool in required if tool not in available_set],
         "unknown": sorted(available_set - set(KNOWN_TOOLS)),
+    }
+
+
+def doctor_workspace(
+    workspace: str | Path,
+    *,
+    codex_home: str | Path | None = None,
+    skills_path: str | Path | None = None,
+    rag_index: str | Path | None = None,
+    supervisor_id: str = "PM-001",
+    supervisor_thread: str = "",
+    declared_callbacks: set[str] | tuple[str, ...] = (),
+) -> dict:
+    """Report the real setup boundary without claiming host execution.
+
+    The doctor may initialize missing local MakeCrew metadata files so the
+    workspace has a stable place for future state. It never edits the Codex
+    global entry, creates conversations, installs Skills, or changes an existing
+    employee registry entry. A malformed existing registry is reported as a
+    review item instead of aborting the whole readiness report.
+    """
+    root = Path(workspace).expanduser().resolve()
+    initialization_error = ""
+    try:
+        initialization = initialize_workspace(root)
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        initialization = {"created_count": "0"}
+        initialization_error = str(exc)
+    codex_root = Path(codex_home or (Path.home() / ".codex")).expanduser().resolve()
+    skill_root = Path(skills_path or (root / "skills")).expanduser().resolve()
+    registry_path = root / ".makecrew" / "employee-registry.json"
+    registry: dict = {}
+    registry_status = "pass"
+    registry_error = ""
+    try:
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+        if not isinstance(registry, dict):
+            raise ValueError("员工注册表必须是 JSON 对象")
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        registry_status = "review"
+        registry_error = f"员工注册表 JSON 无效：{exc}"
+
+    agents_path = codex_root / "AGENTS.md"
+    agents_text = ""
+    if agents_path.is_file():
+        try:
+            agents_text = agents_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as exc:
+            agents_text = ""
+            global_status = "review"
+            global_reason = f"读取入口文件失败：{exc}"
+        else:
+            has_begin = GLOBAL_INTAKE_BEGIN in agents_text
+            has_end = GLOBAL_INTAKE_END in agents_text
+            if has_begin and has_end:
+                global_status = "pass"
+                global_reason = "MakeCrew 全局入口标记完整"
+            elif has_begin or has_end:
+                global_status = "review"
+                global_reason = "入口标记不完整，需要检查 AGENTS.md"
+            else:
+                global_status = "missing"
+                global_reason = "尚未安装 MakeCrew 全局入口"
+    else:
+        global_status = "missing"
+        global_reason = "尚未安装 MakeCrew 全局入口"
+
+    try:
+        skill_report = (
+            audit_skill_directory(skill_root)
+            if skill_root.is_dir()
+            else {
+                "root": str(skill_root), "skill_count": 0, "pass_count": 0,
+                "review_count": 0, "status": "missing", "skills": [],
+            }
+        )
+    except (OSError, ValueError) as exc:
+        skill_report = {
+            "root": str(skill_root), "skill_count": 0, "pass_count": 0,
+            "review_count": 0, "status": "review", "skills": [],
+            "error": str(exc),
+        }
+
+    try:
+        from .discovery import audit_method_catalog
+        method_report = audit_method_catalog()
+    except (OSError, ValueError) as exc:
+        method_report = {"status": "review", "error": str(exc)}
+
+    try:
+        from .capabilities import audit_employee_capabilities
+        capability_report = audit_employee_capabilities()
+        capability_status = "pass" if not (
+            capability_report.get("missing_profiles")
+            or capability_report.get("missing_skill_ids")
+            or capability_report.get("unknown_skill_ids")
+        ) else "review"
+    except (OSError, ValueError, KeyError) as exc:
+        capability_report = {"error": str(exc)}
+        capability_status = "review"
+
+    callbacks = {str(item).strip() for item in declared_callbacks if str(item).strip()}
+    callback_missing = [name for name in ("spawn_subagent", "send_to_thread") if name not in callbacks]
+    if callback_missing:
+        codex_status = "pending_host_adapter"
+        codex_reason = "宿主尚未声明真实 Agent/线程回调；当前只完成本地配置检查"
+    elif not supervisor_thread.strip():
+        codex_status = "review"
+        codex_reason = "回调已声明，但缺少主管线程 ID，尚未完成运行时探测"
+    else:
+        codex_status = "connected"
+        codex_reason = "回调和主管线程均已声明；仍需宿主执行一次真实探测任务"
+    codex_report = {
+        "status": codex_status,
+        "supervisor_id": supervisor_id.strip() or "PM-001",
+        "supervisor_thread": supervisor_thread.strip(),
+        "declared_callbacks": sorted(callbacks),
+        "missing_callbacks": callback_missing,
+        "reason": codex_reason,
+        "runtime_probe": "not_run",
+    }
+
+    if rag_index:
+        rag_path = Path(rag_index).expanduser().resolve()
+        if rag_path.is_file():
+            try:
+                from .rag_store import JsonRagIndex
+                rag_report = {"status": "pass", **JsonRagIndex(rag_path).audit()}
+            except (OSError, ValueError, json.JSONDecodeError) as exc:
+                rag_report = {"status": "review", "index": str(rag_path), "error": str(exc)}
+        else:
+            rag_report = {"status": "missing", "index": str(rag_path), "reason": "指定的 RAG 索引不存在"}
+    else:
+        rag_report = {"status": "not_configured", "reason": "尚未指定持久化 RAG 索引"}
+
+    checks = {
+        "workspace": {
+            "status": registry_status,
+            "path": str(root / ".makecrew"),
+            "employee_count": len(registry),
+            "registry": str(registry_path),
+            "error": registry_error or initialization_error,
+        },
+        "global_intake": {
+            "status": global_status,
+            "agents_file": str(agents_path),
+            "reason": global_reason,
+        },
+        "skills": skill_report,
+        "methods": method_report,
+        "capabilities": {"status": capability_status, **capability_report},
+        "codex": codex_report,
+        "rag": rag_report,
+    }
+    blocking = {
+        "workspace": registry_status,
+        "global_intake": global_status,
+        "skills": skill_report.get("status", "review"),
+        "methods": method_report.get("status", "review"),
+        "capabilities": capability_status,
+        "codex": codex_status,
+        "rag": rag_report.get("status", "review"),
+    }
+    overall = "pass" if all(value == "pass" or value == "connected" for value in blocking.values()) else "review"
+    next_actions = []
+    if global_status != "pass":
+        next_actions.append("运行 install-codex-global-intake，并在重启后重新运行 doctor")
+    if codex_status != "connected":
+        next_actions.append("由宿主绑定 spawn_subagent 和 send_to_thread，再运行一次真实探测任务")
+    if skill_report.get("status") == "missing":
+        next_actions.append("指定宿主 Skill 目录后运行 skill-inventory 或 skill-audit")
+    if rag_report.get("status") in {"missing", "not_configured"}:
+        next_actions.append("按项目需要运行 rag-init 和 rag-sync；不需要共享记忆时可保持未配置")
+    return {
+        "status": overall,
+        "workspace": checks["workspace"],
+        "global_intake": checks["global_intake"],
+        "skills": checks["skills"],
+        "methods": checks["methods"],
+        "capabilities": checks["capabilities"],
+        "codex": checks["codex"],
+        "rag": checks["rag"],
+        "mutations": {
+            "workspace_initialized": int(initialization.get("created_count", "0")) > 0,
+            "global_intake_changed": False,
+            "employees_created": 0,
+            "conversations_created": 0,
+            "skills_installed": 0,
+        },
+        "next_actions": next_actions,
     }
 
 

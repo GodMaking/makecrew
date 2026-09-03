@@ -6,7 +6,7 @@ import argparse
 import json
 from pathlib import Path
 
-from .bootstrap import audit_tools, initialize_workspace, install_codex_global_intake, register_employee
+from .bootstrap import audit_tools, doctor_workspace, initialize_workspace, install_codex_global_intake, register_employee
 from .orchestrator import CrewOrchestrator
 from .intake import plan_batch, plan_request
 from .batch import BatchScheduler
@@ -43,6 +43,20 @@ def main(argv: list[str] | None = None) -> int:
     codex_audit.add_argument("--supervisor-id", default="PM-001", help="supervisor Agent ID")
     codex_audit.add_argument("--supervisor-thread", default="", help="existing supervisor thread ID")
     codex_audit.add_argument("--max-concurrency", type=int, default=3, help="planned native Agent concurrency")
+
+    doctor = subparsers.add_parser(
+        "doctor", help="low-side-effect readiness check for workspace, host, Skills, methods, and RAG"
+    )
+    doctor.add_argument("--path", default=".", help="MakeCrew workspace directory")
+    doctor.add_argument("--codex-home", default=None, help="Codex home containing AGENTS.md")
+    doctor.add_argument("--skills-path", default=None, help="host Skill directory")
+    doctor.add_argument("--rag-index", default=None, help="optional persistent RAG JSON index")
+    doctor.add_argument("--supervisor-id", default="PM-001", help="supervisor Agent ID")
+    doctor.add_argument("--supervisor-thread", default="", help="declared supervisor thread ID")
+    doctor.add_argument(
+        "--callback", action="append", default=[], dest="declared_callbacks",
+        help="declared host callback; repeat for spawn_subagent and send_to_thread",
+    )
 
     global_intake = subparsers.add_parser(
         "install-codex-global-intake",
@@ -142,6 +156,16 @@ def main(argv: list[str] | None = None) -> int:
             supervisor_id=args.supervisor_id,
             supervisor_thread_id=args.supervisor_thread,
         ).audit(max_concurrency=args.max_concurrency)
+    elif args.command == "doctor":
+        result = doctor_workspace(
+            args.path,
+            codex_home=args.codex_home,
+            skills_path=args.skills_path,
+            rag_index=args.rag_index,
+            supervisor_id=args.supervisor_id,
+            supervisor_thread=args.supervisor_thread,
+            declared_callbacks=args.declared_callbacks,
+        )
     elif args.command == "install-codex-global-intake":
         result = install_codex_global_intake(args.codex_home)
     elif args.command == "rag-init":

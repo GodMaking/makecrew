@@ -261,6 +261,29 @@ makecrew capability-audit
 makecrew codex-audit --supervisor-id PM-001
 ```
 
+### Post-install readiness check
+
+After installation or a restart, inspect which layers are actually connected:
+
+```bash
+makecrew doctor --path ./my-ai-workspace \
+  --codex-home CODEX_HOME --skills-path SKILLS_PATH
+```
+
+The report separates the local `.makecrew` workspace, global `AGENTS.md` intake,
+Skill and method directories, role capabilities, Codex host callbacks, and an
+optional RAG index. `pass` means the static check passed; `pending_host_adapter`
+means the host still needs `spawn_subagent` and `send_to_thread`; `connected` means
+the callbacks and supervisor thread were declared, not that a task has run;
+`runtime_probe: not_run` remains until a real probe produces evidence. RAG
+`not_configured` means shared memory is disabled, not that an index is broken.
+
+`doctor` is low-side-effect: it may initialize missing minimal `.makecrew` metadata,
+but it does not install Skills, create employees or conversations, edit global
+`AGENTS.md`, or turn a generated plan into an execution claim. Run one clear task
+and one multi-task batch after host wiring, and retain test, file, or host receipts
+as end-to-end evidence.
+
 ### P0 quality and recovery tools
 
 The repository also includes three lightweight, optional contracts that can be

@@ -381,6 +381,25 @@ makecrew capability-audit
 makecrew codex-audit --supervisor-id PM-001
 ```
 
+### 安装后的就绪检查
+
+安装或重启后，可以用 `doctor` 一次查看哪些部分已经接通：
+
+```bash
+makecrew doctor --path ./my-ai-workspace \
+  --codex-home CODEX_HOME --skills-path SKILLS_PATH
+```
+
+它会分别检查 `.makecrew` 工作区、全局 `AGENTS.md` 入口、Skill 目录、内置方法、岗位能力、
+Codex 宿主回调和可选 RAG 索引。`pass` 表示静态检查通过，`pending_host_adapter` 表示还需要宿主
+绑定 `spawn_subagent`/`send_to_thread`，`connected` 只表示回调和主管线程已声明，
+`runtime_probe: not_run` 则表示尚未执行真实探测任务。RAG 显示 `not_configured` 是未启用共享记忆，
+不是索引损坏。
+
+`doctor` 是低副作用检查：只会在缺失时初始化最小 `.makecrew` 元数据；不会安装 Skill、创建员工或
+对话、修改全局 `AGENTS.md`，也不会把“生成了计划”当成真实执行。完成宿主接入后，请再运行一次真实
+小任务并保留测试、文件或工具回执作为端到端证据。
+
 ### P0 质量与恢复工具
 
 除了路由和批次调度，仓库还提供三个轻量、可选的运行契约，适合在宿主

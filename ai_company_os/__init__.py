@@ -3,7 +3,7 @@
 from .router import route_task
 from .task_state import TaskLedger, TaskStatus
 from .learning import LearningEngine, ProposalStatus
-from .bootstrap import audit_tools, initialize_workspace, install_codex_global_intake, register_employee
+from .bootstrap import audit_tools, doctor_workspace, initialize_workspace, install_codex_global_intake, register_employee
 from .orchestrator import CrewOrchestrator
 from .intake import plan_request, plan_batch
 from .batch import AgentDispatcher, BatchScheduler
@@ -17,4 +17,4 @@ from .rag_identity import scope_for_employee, scope_payload
 from .skill_audit import audit_skill_directory, audit_skill_file, inventory_skill_directory
 from .checkpoint import JsonCheckpointStore, RetryPolicy
 
-__all__ = ["route_task", "TaskLedger", "TaskStatus", "LearningEngine", "ProposalStatus", "audit_tools", "initialize_workspace", "install_codex_global_intake", "register_employee", "CrewOrchestrator", "plan_request", "plan_batch", "AgentDispatcher", "BatchScheduler", "CodexAdapter", "CodexAgentRef", "CodexHost", "build_employee_prompt", "build_supervisor_prompt", "build_workflow", "ready_nodes", "EMPLOYEE_SKILL_MATRIX", "audit_employee_capabilities", "skill_ids_for_employee", "audit_method_catalog", "discover_methods", "resolve_skills", "KnowledgeRecord", "RetrievalScope", "RetrievalHit", "Retriever", "SemanticScorer", "HybridRetriever", "HostRagAdapter", "JsonRagIndex", "plan_directory", "sha256_file", "scope_for_employee", "scope_payload", "audit_skill_directory", "audit_skill_file", "inventory_skill_directory", "JsonCheckpointStore", "RetryPolicy"]
+__all__ = ["route_task", "TaskLedger", "TaskStatus", "LearningEngine", "ProposalStatus", "audit_tools", "doctor_workspace", "initialize_workspace", "install_codex_global_intake", "register_employee", "CrewOrchestrator", "plan_request", "plan_batch", "AgentDispatcher", "BatchScheduler", "CodexAdapter", "CodexAgentRef", "CodexHost", "build_employee_prompt", "build_supervisor_prompt", "build_workflow", "ready_nodes", "EMPLOYEE_SKILL_MATRIX", "audit_employee_capabilities", "skill_ids_for_employee", "audit_method_catalog", "discover_methods", "resolve_skills", "KnowledgeRecord", "RetrievalScope", "RetrievalHit", "Retriever", "SemanticScorer", "HybridRetriever", "HostRagAdapter", "JsonRagIndex", "plan_directory", "sha256_file", "scope_for_employee", "scope_payload", "audit_skill_directory", "audit_skill_file", "inventory_skill_directory", "JsonCheckpointStore", "RetryPolicy"]
