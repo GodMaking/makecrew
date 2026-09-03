@@ -28,9 +28,15 @@ def render_result(task: str, project: str = "") -> str:
     gates = "".join(f"<li>{html.escape(gate)}</li>" for gate in result["acceptance_gates"])
     discovery = discover_methods(task, result["domains"])
     methods = "".join(
-        f"<li><b>{html.escape(item['name'])}</b>：{html.escape(item['approach'])}；"
-        f"适用理由：{html.escape(item['why'])}；Skill：{html.escape('、'.join(item['skill_ids']))}</li>"
-        for item in discovery["methods"]
+        f"<li><b>#{item.get('selection_rank', index + 1)} {html.escape(item['name'])}</b> "
+        f"(匹配度 {item.get('relevance_score', 0):.2f})：{html.escape(item['approach'])}；"
+        f"适用理由：{html.escape(item['why'])}；Skill：{html.escape('、'.join(item['skill_ids']))}；"
+        f"适用时机：{html.escape('、'.join(item.get('when_to_use', [])) or '按任务判断')}；"
+        f"交付：{html.escape('、'.join(item.get('deliverables', [])) or '按任务定义')}；"
+        f"成本：{html.escape(item.get('cost', '按当前任务评估'))}；"
+        f"匹配依据：{html.escape('、'.join(item.get('match_reasons', [])))}；"
+        f"来源：{html.escape(item.get('source', '未知'))}</li>"
+        for index, item in enumerate(discovery["methods"])
     ) or "<li>需求清楚后再生成候选方法。</li>"
     core_roles = "、".join(result["core_roles"])
     optional_roles = "、".join(item["name"] for item in result["specialist_templates"])
@@ -46,7 +52,10 @@ def render_result(task: str, project: str = "") -> str:
     interrupts = "、".join(workflow["interrupts"]) or "无"
     policy = result["execution_policy"]
     policy_text = f"恢复：{'开启' if policy['resume_on_restart'] else '关闭'}；状态持久化：{'开启' if policy['persist_task_state'] else '关闭'}；交接：{policy['handoff_format']}"
-    return f"<div class='grid'>{cards}</div><h2>推荐方法与 Skill</h2><p>以下是候选，不会自动安装或执行，确认后再使用。</p><ul>{methods}</ul><h2>岗位底座（按需批准创建）</h2><p>核心岗位：{html.escape(core_roles)}；可选模板：{html.escape(optional_roles)}</p><h2>并行任务与员工能力</h2><ul>{assignments}</ul><h2>工作流图</h2><p>并行组：{html.escape(parallel_text)}；人审中断点：{html.escape(interrupts)}；检查点：{html.escape('、'.join(workflow['checkpoints']))}</p><ul>{workflow_nodes}</ul><h2>验收门禁</h2><ul>{gates}</ul><h2>恢复策略</h2><p>{html.escape(policy_text)}</p><h2>下一步</h2><p>{html.escape(result['next_action'])}</p><details><summary>结构化结果</summary><pre>{html.escape(json.dumps(result, ensure_ascii=False, indent=2))}</pre></details>"
+    method_stats = f"返回 {discovery.get('returned_count', len(discovery['methods']))} 张卡片"
+    if discovery.get("external_searched"):
+        method_stats += f"；宿主搜索 {discovery.get('external_result_count', 0)} 条，展示前 {discovery.get('returned_count', 0)} 条"
+    return f"<div class='grid'>{cards}</div><h2>推荐方法与 Skill</h2><p>{html.escape(method_stats)}。以下是候选，不会自动安装或执行，确认后再使用。</p><ul>{methods}</ul><h2>岗位底座（按需批准创建）</h2><p>核心岗位：{html.escape(core_roles)}；可选模板：{html.escape(optional_roles)}</p><h2>并行任务与员工能力</h2><ul>{assignments}</ul><h2>工作流图</h2><p>并行组：{html.escape(parallel_text)}；人审中断点：{html.escape(interrupts)}；检查点：{html.escape('、'.join(workflow['checkpoints']))}</p><ul>{workflow_nodes}</ul><h2>验收门禁</h2><ul>{gates}</ul><h2>恢复策略</h2><p>{html.escape(policy_text)}</p><h2>下一步</h2><p>{html.escape(result['next_action'])}</p><details><summary>结构化结果</summary><pre>{html.escape(json.dumps(result, ensure_ascii=False, indent=2))}</pre></details>"
 
 
 PAGE = """<!doctype html><html lang='zh-CN'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>AgentFlow OS</title><style>body{font-family:system-ui;max-width:900px;margin:30px auto;padding:0 18px;background:#f5f7fb;color:#172033}main{background:#fff;padding:26px;border:1px solid #dfe5ef;border-radius:10px}textarea,input{box-sizing:border-box;width:100%;padding:11px;margin:7px 0 12px;border:1px solid #bbc6d8;border-radius:6px;font:inherit}textarea{min-height:105px}button{padding:11px 18px;background:#1769e0;color:#fff;border:0;border-radius:6px;font-weight:600}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:20px}.card{padding:12px;background:#f0f4fa;border:1px solid #dce4f0;border-radius:6px}pre{background:#111827;color:#e7eef9;padding:14px;overflow:auto;white-space:pre-wrap}</style><main><h1>AgentFlow OS</h1><p>智流工作系统（MakeCrew 兼容别名）：输入任务，查看需求路由、Skill 匹配、协作组、验收门禁和 Token 预算。</p><form><label>任务描述</label><textarea name='task' placeholder='例如：开发网站并准备上线，同时研究用户并写宣传文案'>{task}</textarea><label>项目名（可选）</label><input name='project' value='{project}'><button>生成协作计划</button></form>{result}</main></html>"""

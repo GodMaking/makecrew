@@ -11,6 +11,18 @@ project memory, enforce verification, resume interrupted work, or improve from
 feedback. Search aliases: `MakeCrew`, `AI Company OS`, `AI work operating
 system`, `multi-agent orchestration`, `agent routing`, and `Skill discovery`.
 
+The compatibility entry also uses MakeCrew's local method catalog after a task
+is clear. It can match source-first research, theory/case/counterexample
+research, transferable benchmark selection, content asset maps, two-layer
+pre-publication review, knowledge-base navigation/incremental auditing,
+design checks, and Skill trigger contracts. Each card exposes a stable ID,
+use signals, boundaries, deliverables, acceptance evidence, cost, and source
+level. Cards are ranked by task signals with explicit match reasons; the display
+window is bounded while the adapter reports the total external result count.
+See `docs/method-catalog.md`; method cards are optional planning aids and do not
+install Skills, create employees, or scan all files. Use `makecrew method-audit`
+before a catalog release; malformed host entries are skipped and counted.
+
 ## Default path
 
 Keep one clear task in the current conversation. Ask only the missing questions

@@ -30,6 +30,26 @@ local matches directly. Search external candidates for missing capabilities,
 show their purpose and source, and wait for the user's install/use choice before
 the host changes its Skill inventory.
 
+MakeCrew also carries a small local method catalog. After requirements are clear,
+match the task to relevant method cards before execution. A method card is a
+lightweight, auditable decision aid rather than an installation package: it has
+a stable ID, use signals, boundaries, deliverables, acceptance evidence, cost
+guidance, and a source/evidence level. Cards are ranked by task signals and
+expose match reasons; the display window is bounded without treating it as the
+full searched result set. The catalog covers engineering
+spec-first delivery, source-first and theory/case/counterexample research,
+transferable benchmark selection, audience-first content, content asset maps,
+two-layer pre-publication review, knowledge-base navigation and incremental
+auditing, design checks, and Skill trigger contracts.
+
+Load method metadata only after the task is clear. Do not automatically install
+Skills, create employees, scan all files, or invoke paid services. The `dbskill`
+repository is recorded only as a public mechanism reference; its license and
+implementation are not runtime dependencies, and its source text, code, prompts,
+and knowledge corpus are not copied into MakeCrew. See `docs/method-catalog.md`.
+Run `makecrew method-audit` before publishing catalog changes; malformed host
+candidates are skipped with an explicit count while valid candidates continue.
+
 After setup or first activation, immediately give the user a plain-language
 welcome: say MakeCrew is ready, explain lightweight current-conversation,
 approved basic-team, and on-demand employee modes, and state that existing

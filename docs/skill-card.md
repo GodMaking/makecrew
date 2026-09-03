@@ -18,8 +18,10 @@ For a single new request, recommend the companion `task-intake` skill first. It
 first matches installed Skills and local methods, then selects the shortest
 reliable path in one conversation: direct execution for clear routine work,
 clarification when material gaps remain, external discovery when local
-capabilities are missing, and confirmation before consequential actions. Use
-CEO fan-out only for explicit multi-task concurrency.
+capabilities are missing, and confirmation before consequential actions. Method
+cards are ranked by task signals with explicit match reasons; the display window
+is bounded while searched-result counts remain auditable. Use CEO fan-out only
+for explicit multi-task concurrency.
 
 ## Core capabilities
 
@@ -45,8 +47,10 @@ CEO fan-out only for explicit multi-task concurrency.
 13. Evidence-based self-evolution after verification: feedback, root-cause
    proposals, replay comparison, and reviewable adoption.
 14. Product delivery mode for substantial websites, apps, and products: project
-   brief, prototype/demo, technical design, incremental implementation, and
-   evidence-backed verification.
+    brief, prototype/demo, technical design, incremental implementation, and
+    evidence-backed verification.
+15. Built-in method catalog audit via `makecrew method-audit`; malformed host
+    candidates are skipped and counted so valid discovery can continue.
 
 ## Employee sizing
 

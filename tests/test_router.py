@@ -23,6 +23,7 @@ from ai_company_os.intake import plan_batch, plan_request
 from ai_company_os.batch import BatchScheduler
 from ai_company_os.capabilities import EMPLOYEE_SKILL_MATRIX, audit_employee_capabilities
 from ai_company_os.workflow import build_workflow, ready_nodes
+from ai_company_os.discovery import audit_method_catalog, discover_methods
 
 
 class RouteTaskTests(unittest.TestCase):
@@ -126,6 +127,98 @@ class RouteTaskTests(unittest.TestCase):
         finally:
             server.shutdown()
             server.server_close()
+
+
+class DiscoveryMethodTests(unittest.TestCase):
+    def test_builtin_method_catalog_has_unique_complete_cards(self):
+        report = audit_method_catalog()
+
+        self.assertEqual(report["status"], "pass")
+        self.assertGreaterEqual(report["card_count"], 10)
+        self.assertEqual(report["issues"], [])
+
+    def test_research_catalog_includes_mechanism_and_counterexample_method(self):
+        result = discover_methods("研究 AI 多 Agent 框架并找值得借鉴的案例", ["研究"])
+
+        names = {item["name"] for item in result["methods"]}
+        self.assertIn("理论-案例-反例研究", names)
+        method = next(item for item in result["methods"] if item["method_id"] == "research-theory-case-counterexample")
+        self.assertTrue(method["acceptance_gates"])
+        self.assertTrue(any("适用条件" in item for item in method["deliverables"]))
+        self.assertEqual(method["source_license"], "CC BY-NC 4.0")
+        self.assertEqual(result["catalog_version"], "2026-09-02")
+        self.assertEqual(result["catalog_sources"]["dbskill"]["version"], "2.18.39")
+
+    def test_content_and_knowledge_catalogs_are_progressive_and_bounded(self):
+        content = discover_methods("整理旧文稿并建立主题地图", ["内容"])
+        knowledge = discover_methods("建立共享知识库并按变化增量同步", ["知识库"])
+
+        content_method = next(item for item in content["methods"] if item["method_id"] == "content-asset-map")
+        knowledge_method = next(item for item in knowledge["methods"] if item["method_id"] == "knowledge-navigation-incremental-audit")
+        self.assertIn("少量素材不进入重型工程", content_method["boundaries"])
+        self.assertIn("未变化文件不重复处理", knowledge_method["acceptance_gates"])
+        self.assertTrue(content_method["cost"])
+        self.assertTrue(knowledge_method["cost"])
+
+    def test_method_results_are_ranked_by_task_signals_before_display_cap(self):
+        result = discover_methods("整理旧文稿并建立主题地图", ["内容"])
+
+        self.assertEqual(result["methods"][0]["method_id"], "content-asset-map")
+        self.assertEqual(result["methods"][0]["selection_rank"], 1)
+        self.assertTrue(result["methods"][0]["relevance_score"] > 0)
+        self.assertTrue(result["methods"][0]["match_reasons"])
+
+    def test_external_methods_are_all_ranked_before_the_display_cap_and_get_ids(self):
+        def searcher(task, domains):
+            return [
+                {"name": f"外部方法 {index}", "when_to_use": ["主题地图"] if index == 7 else ["其他"], "source": f"https://example.com/{index}"}
+                for index in range(10)
+            ]
+
+        result = discover_methods("建立主题地图", ["内容"], searcher=searcher, search_external=True)
+
+        self.assertEqual(result["external_result_count"], 10)
+        self.assertEqual(result["returned_count"], 8)
+        self.assertEqual(result["methods"][0]["name"], "外部方法 7")
+        self.assertTrue(result["methods"][0]["method_id"].startswith("external-"))
+        self.assertEqual(len({item["method_id"] for item in result["methods"]}), 8)
+
+    def test_malformed_external_method_does_not_discard_valid_results(self):
+        result = discover_methods(
+            "研究用户趋势",
+            ["研究"],
+            searcher=lambda task, domains: [None, {"name": "有效候选", "source": "https://example.com"}],
+            search_external=True,
+        )
+
+        self.assertEqual(result["external_result_count"], 2)
+        self.assertEqual(result["invalid_external_result_count"], 1)
+        self.assertIn("有效候选", {item["name"] for item in result["methods"]})
+
+    def test_malformed_skill_candidate_does_not_discard_valid_results(self):
+        result = plan_request(
+            "修复登录页表单校验并补测试，项目目录为 demo",
+            installed_skill_ids=[],
+            skill_searcher=lambda task, missing: [None, {
+                "skill_id": missing[0],
+                "name": "有效 Skill",
+                "source": "https://example.com/skill",
+            }],
+        )
+
+        self.assertEqual(result["status"], "ready_for_skill_choice")
+        resolution = result["skill_resolution"]
+        self.assertEqual(resolution["external_result_count"], 2)
+        self.assertEqual(resolution["invalid_candidate_count"], 1)
+        self.assertEqual(resolution["returned_count"], 1)
+        self.assertEqual(resolution["candidates"][0]["name"], "有效 Skill")
+
+    def test_unclear_discovery_does_not_load_method_catalog(self):
+        result = discover_methods("帮我处理一下", ["待澄清"])
+
+        self.assertEqual(result["status"], "deferred_until_clear")
+        self.assertEqual(result["methods"], [])
+        self.assertEqual(result["catalog_sources"], {})
 
 
 class TaskLedgerTests(unittest.TestCase):
