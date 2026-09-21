@@ -12,10 +12,11 @@ from .intake import plan_batch, plan_request
 from .batch import BatchScheduler
 from .codex_adapter import CodexAdapter
 from .capabilities import audit_employee_capabilities
-from .discovery import audit_method_catalog
+from .discovery import audit_method_catalog, inventory_external_skill_package
 from .skill_audit import audit_skill_directory, inventory_skill_directory
 from .rag import RetrievalScope
 from .rag_store import JsonRagIndex, plan_directory
+from .ceo_continuity import CeoContinuityManager
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -36,6 +37,11 @@ def main(argv: list[str] | None = None) -> int:
 
     skill_inventory = subparsers.add_parser("skill-inventory", help="list local Skill metadata without loading instructions")
     skill_inventory.add_argument("--path", default="skills", help="directory containing one subdirectory per Skill")
+
+    external_inventory = subparsers.add_parser(
+        "external-skill-inventory", help="read external Skill package metadata without loading instructions"
+    )
+    external_inventory.add_argument("--path", required=True, help="external package root containing skills/")
 
     method_audit = subparsers.add_parser("method-audit", help="validate the built-in method catalog")
 
@@ -138,6 +144,35 @@ def main(argv: list[str] | None = None) -> int:
         help="set a per-task tool-call budget; repeat as needed",
     )
 
+    ceo_status = subparsers.add_parser("ceo-status", help="show durable CEO generation and handoff state")
+    ceo_status.add_argument("--path", default=".", help="MakeCrew workspace directory")
+
+    ceo_assess = subparsers.add_parser("ceo-assess", help="assess CEO conversation context pressure")
+    ceo_assess.add_argument("--path", default=".", help="MakeCrew workspace directory")
+    ceo_assess.add_argument("--used-tokens", required=True, type=int)
+    ceo_assess.add_argument("--context-window", required=True, type=int)
+
+    ceo_prepare = subparsers.add_parser("ceo-prepare-handoff", help="write a compact CEO handoff package")
+    ceo_prepare.add_argument("--path", default=".", help="MakeCrew workspace directory")
+    ceo_prepare.add_argument("--current-thread", required=True, help="current CEO host thread ID")
+    ceo_prepare.add_argument("--snapshot", required=True, help="JSON file containing current operational state")
+
+    ceo_candidate = subparsers.add_parser("ceo-register-candidate", help="bind a new CEO thread to a handoff")
+    ceo_candidate.add_argument("--path", default=".", help="MakeCrew workspace directory")
+    ceo_candidate.add_argument("--thread", required=True, help="new CEO host thread ID")
+    ceo_candidate.add_argument("--handoff", required=True, help="handoff ID")
+
+    ceo_verify = subparsers.add_parser("ceo-verify", help="verify a candidate CEO has covered active state")
+    ceo_verify.add_argument("--path", default=".", help="MakeCrew workspace directory")
+    ceo_verify.add_argument("--thread", required=True, help="new CEO host thread ID")
+    ceo_verify.add_argument("--handoff", required=True, help="handoff ID")
+    ceo_verify.add_argument("--verification", required=True, help="candidate verification JSON file")
+
+    ceo_activate = subparsers.add_parser("ceo-activate", help="atomically switch the active CEO pointer")
+    ceo_activate.add_argument("--path", default=".", help="MakeCrew workspace directory")
+    ceo_activate.add_argument("--thread", required=True, help="verified CEO host thread ID")
+    ceo_activate.add_argument("--handoff", required=True, help="handoff ID")
+
     args = parser.parse_args(argv)
     if args.command == "init":
         result = initialize_workspace(args.path, project=args.project)
@@ -149,6 +184,8 @@ def main(argv: list[str] | None = None) -> int:
         result = audit_skill_directory(args.path)
     elif args.command == "skill-inventory":
         result = inventory_skill_directory(args.path)
+    elif args.command == "external-skill-inventory":
+        result = inventory_external_skill_package(args.path)
     elif args.command == "method-audit":
         result = audit_method_catalog()
     elif args.command == "codex-audit":
@@ -240,6 +277,20 @@ def main(argv: list[str] | None = None) -> int:
         result["tasks"] = scheduler.plan()["tasks"]
         result["overview"] = scheduler.overview()
         result["execution"] = "host_adapter_required"
+    elif args.command == "ceo-status":
+        result = CeoContinuityManager(args.path).status()
+    elif args.command == "ceo-assess":
+        result = CeoContinuityManager.assess_context(args.used_tokens, args.context_window)
+    elif args.command == "ceo-prepare-handoff":
+        snapshot = _read_json_object(args.snapshot, "CEO 接班快照")
+        result = CeoContinuityManager(args.path).prepare_handoff(snapshot, args.current_thread)
+    elif args.command == "ceo-register-candidate":
+        result = CeoContinuityManager(args.path).register_candidate(args.thread, args.handoff)
+    elif args.command == "ceo-verify":
+        verification = _read_json_object(args.verification, "CEO 接班校验")
+        result = CeoContinuityManager(args.path).verify_candidate(args.thread, args.handoff, verification)
+    elif args.command == "ceo-activate":
+        result = CeoContinuityManager(args.path).activate(args.thread, args.handoff)
     else:
         result = CrewOrchestrator(args.path).dispatch(
             " ".join(args.task),
@@ -265,6 +316,13 @@ def _parse_assignments(items: list[str], label: str) -> dict[str, str]:
             raise SystemExit(f"{label}重复指定任务：{task_id}")
         parsed[task_id] = value
     return parsed
+
+
+def _read_json_object(path: str, label: str) -> dict:
+    payload = json.loads(Path(path).expanduser().read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise SystemExit(f"{label}必须是 JSON 对象")
+    return payload
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 ---
 name: makecrew
-description: MakeCrew is an adaptive open-source AI work framework for requirement clarification, local-first Skill discovery, Agent routing, project memory, review gates, resumable task state, and evidence-based self-evolution.
+description: MakeCrew is an adaptive AI work framework for requirement clarification, local-first Skill discovery, Agent routing, project memory, review gates, resumable task state, and evidence-based self-evolution.
 ---
 
 # MakeCrew
@@ -95,6 +95,27 @@ to keep a batch within cost. Reuse the `(employee_id, project)` thread before
 opening a conversation. `pause`, `resume`, `cancel`, and `mark_failed` preserve
 state and reasons. The scheduler is a queue/state kernel; the host adapter must
 perform actual conversation creation and tool execution.
+
+## CEO continuity
+
+Treat `CEO-001` as a durable role and its host conversation as a replaceable
+generation. When the host can report context usage, use these thresholds:
+below 70% continue; 70%-85% compress completed information; 85%-95% prepare a
+handoff; at 95% or above complete the handoff before accepting complex work.
+The explicit phrase `给 CEO 换一个新对话` also starts this flow.
+
+Use `CeoContinuityManager` to prepare a digest-protected package containing only
+the company-memory reference, active portfolio, open tasks, active decisions,
+employee status, high risks, budgets, next actions, and evidence references.
+Never copy the full conversation transcript. A candidate CEO must use a
+different thread and echo every active project, open task, active decision,
+high-risk ID, and the package digest. Activate it only after verification.
+
+For Codex, bind `open_supervisor_thread`, `send_to_thread`,
+`set_thread_pinned`, and `set_thread_archived`, then call
+`CodexAdapter.rollover_ceo()`. Missing callbacks or incomplete verification keep
+the old active pointer. Do not claim that a thread was created, pinned, or
+archived unless the corresponding host callback returned successfully.
 
 ## Quality and recovery contracts
 

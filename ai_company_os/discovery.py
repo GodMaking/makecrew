@@ -9,11 +9,60 @@ from __future__ import annotations
 
 import hashlib
 import re
+from pathlib import Path
 from typing import Any, Callable, Iterable
 
 
 MethodSearcher = Callable[[str, list[str]], list[dict[str, Any]]]
 SkillSearcher = Callable[[str, list[str]], list[dict[str, Any]]]
+
+
+def inventory_external_skill_package(root: str | Path) -> dict[str, Any]:
+    """Read Skill metadata from an external package without importing its content.
+
+    This keeps third-party Skills optional and progressive: MakeCrew sees names,
+    descriptions and paths for routing, then the host decides whether a matched
+    Skill may be loaded. It deliberately does not copy or execute package files.
+    """
+    package = Path(root).expanduser()
+    skills_root = package / "skills"
+    entries: list[dict[str, Any]] = []
+    issues: list[dict[str, str]] = []
+    if not skills_root.is_dir():
+        return {"status": "missing_skills_directory", "root": str(package), "skills": [], "issues": []}
+    for skill_file in sorted(skills_root.glob("*/SKILL.md")):
+        try:
+            text = skill_file.read_text(encoding="utf-8")
+            if not text.startswith("---"):
+                raise ValueError("missing frontmatter")
+            _, frontmatter, _ = text.split("---", 2)
+            meta: dict[str, str] = {}
+            for line in frontmatter.splitlines():
+                key, separator, value = line.partition(":")
+                if separator:
+                    meta[key.strip()] = value.strip().strip("'\"")
+            name = str(meta.get("name") or skill_file.parent.name).strip()
+            description = str(meta.get("description") or "").strip()
+            if not description:
+                issues.append({"path": str(skill_file), "code": "missing_description"})
+            entries.append({
+                "skill_id": name,
+                "name": name,
+                "description": description,
+                "path": str(skill_file),
+                "source": "external_package",
+                "load_policy": "on_match_and_host_approval",
+            })
+        except (OSError, ValueError, TypeError) as exc:
+            issues.append({"path": str(skill_file), "code": "invalid_metadata", "detail": str(exc)})
+    return {
+        "status": "ok",
+        "root": str(package),
+        "skills": entries,
+        "skill_count": len(entries),
+        "issues": issues,
+        "content_loaded": False,
+    }
 
 PROGRESSIVE_DISCLOSURE_POLICY = {
     "metadata": "startup_or_inventory",

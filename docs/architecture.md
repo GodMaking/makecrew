@@ -24,6 +24,10 @@ MakeCrew maps directly onto the host's native Agent threads:
 
 The host adapter creates or reuses the actual Codex threads. MakeCrew records the parent supervisor ID, employee Agent ID, thread identity, and structured result contract so the mapping remains inspectable across hosts. Independent write scopes should map to separate Worktrees; overlapping write scopes remain serial.
 
+### CEO generation rotation
+
+The CEO is a durable role (`CEO-001`), not a permanent thread. `CeoContinuityManager` keeps one active thread pointer and a generation ledger. Rotation is a two-phase handoff: write a compact, digest-protected package; open a candidate thread; require it to echo all active project, open task, active decision, and high-risk IDs; complete host pin/archive operations; then atomically switch the local active pointer. A failed callback or incomplete verification leaves the old pointer active. Full transcripts are never part of the handoff contract.
+
 ## Adaptive lifecycle
 
 There is no mandatory full lifecycle. The router selects the smallest graph

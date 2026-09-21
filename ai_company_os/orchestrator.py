@@ -14,7 +14,7 @@ from typing import Any, Callable
 
 from .bootstrap import initialize_workspace
 from .router import CORE_EMPLOYEE_PROFILES, EMPLOYEE_PROFILES, route_task
-from .capabilities import skill_ids_for_employee
+from .capabilities import skill_ids_for_employee, tool_policy_for_employee
 from .rag_identity import scope_payload, scope_for_employee
 from .intake import plan_request
 
@@ -300,12 +300,24 @@ class CrewOrchestrator:
                 project_ids=(project,) if project else (),
                 memory_scope=assignment.get("memory_scope", "project"),
             )
+            employee_record = registry.get(assignment["employee_id"], {})
+            effective_tools = list(employee_record.get("tools", assignment.get("tools", [])))
+            effective_tool_policy = tool_policy_for_employee({
+                **employee_record,
+                "tools": effective_tools,
+            })
+            assignment = {
+                **assignment,
+                "tools": effective_tools,
+                "tool_policy": effective_tool_policy,
+            }
             payload = {
                 "task": task.strip(),
                 "project": project,
                 "supervisor_id": supervisor_id,
                 "task_id": task_id,
                 "assignment": assignment,
+                "tool_policy": effective_tool_policy,
                 "rag_scope": scope_payload(rag_scope),
                 "acceptance_gates": plan["acceptance_gates"],
                 "instruction": "只执行分配范围，完成后回传结果、证据、风险和下一步。",

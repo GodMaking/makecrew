@@ -162,6 +162,30 @@ EMPLOYEE_SKILL_MATRIX: dict[str, tuple[str, ...]] = {
     ),
 }
 
+ALL_ENABLED_TOOLS = ("*",)
+
+
+def tool_policy_for_employee(employee: dict[str, Any]) -> dict[str, Any]:
+    """Return an auditable tool policy; ``*`` means host-enabled tools only."""
+    tools = list(employee.get("tools", ()))
+    if "*" in tools or employee.get("tool_policy") == "all_enabled_host_tools":
+        return {
+            "mode": "all_enabled_host_tools",
+            "tools": list(ALL_ENABLED_TOOLS),
+            "requires_runtime_inventory": True,
+            "confirmation_required_for": list(employee.get("confirmation_required_for", ())),
+        }
+    return {"mode": "allowlist", "tools": tools, "requires_runtime_inventory": False, "confirmation_required_for": []}
+
+
+def resolve_employee_tools(employee: dict[str, Any], available_tools: list[str] | tuple[str, ...] | set[str]) -> list[str]:
+    """Resolve a wildcard policy against the host's real runtime inventory."""
+    policy = tool_policy_for_employee(employee)
+    available = sorted({str(item).strip() for item in available_tools if str(item).strip()})
+    if policy["mode"] == "all_enabled_host_tools":
+        return available
+    return [item for item in policy["tools"] if item in available]
+
 
 def skill_ids_for_employee(employee_id: str) -> list[str]:
     """Return a copy so callers cannot mutate the canonical matrix."""

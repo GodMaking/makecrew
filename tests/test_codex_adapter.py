@@ -1,10 +1,50 @@
+import tempfile
 import unittest
 
-from ai_company_os import BatchScheduler, CodexAdapter
+from ai_company_os import BatchScheduler, CeoContinuityManager, CodexAdapter
 from ai_company_os.bootstrap_cli import main
 
 
 class CodexAdapterTests(unittest.TestCase):
+    @staticmethod
+    def _ceo_snapshot():
+        return {
+            "company_memory_ref": ".makecrew/company-memory.md",
+            "portfolio": [{"project_id": "P1"}],
+            "open_tasks": [{"task_id": "T1"}],
+            "active_decisions": [{"decision_id": "D1"}],
+            "employee_status": [],
+            "risks": [{"risk_id": "R1", "impact": "high"}],
+            "budgets": [],
+            "next_actions": [],
+            "evidence_refs": [],
+        }
+
+    def test_wildcard_tool_policy_resolves_to_real_host_inventory(self):
+        spawned = []
+
+        def spawn(prompt, metadata):
+            spawned.append((prompt, metadata))
+            return {"status": "accepted", "thread_id": "pm-thread"}
+
+        adapter = CodexAdapter(
+            spawn_subagent=spawn,
+            available_tools=["filesystem", "browser", "github", "imagegen"],
+        )
+        packet = {
+            "task": "规划产品",
+            "project": "demo",
+            "employee": {"agent_id": "PM-PRODUCT-001", "role": "产品经理", "tools": ["*"]},
+            "tool_policy": {"mode": "all_enabled_host_tools", "tools": ["*"], "requires_runtime_inventory": True},
+        }
+
+        result = adapter.dispatch("", packet)
+
+        self.assertEqual(result["thread_id"], "pm-thread")
+        self.assertEqual(spawned[0][1]["tools"], ["browser", "filesystem", "github", "imagegen"])
+        self.assertEqual(spawned[0][1]["tool_policy"]["mode"], "all_enabled_host_tools")
+        self.assertIn("枚举宿主本轮实际启用的工具", spawned[0][0])
+
     def test_audit_reports_unwired_native_callbacks(self):
         adapter = CodexAdapter(supervisor_id="PM-DEMO")
 
@@ -134,6 +174,103 @@ class CodexAdapterTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "failed")
         self.assertEqual(result["failure_reason"], "线程超时")
+
+    def test_ceo_rollover_uses_verified_host_thread_and_archives_old(self):
+        with tempfile.TemporaryDirectory() as directory:
+            manager = CeoContinuityManager(directory)
+            pinned = []
+            archived = []
+
+            def send(thread_id, prompt):
+                handoff = manager._read_handoff(manager.status()["pending_handoff"]["handoff_id"])
+                return {"verification": {
+                    "project_ids": ["P1"],
+                    "task_ids": ["T1"],
+                    "decision_ids": ["D1"],
+                    "risk_ids": ["R1"],
+                    "handoff_digest": handoff["digest"],
+                }}
+
+            adapter = CodexAdapter(
+                supervisor_id="CEO-001",
+                supervisor_thread_id="ceo-old",
+                open_supervisor_thread=lambda ceo_id, metadata: {"thread_id": "ceo-new"},
+                send_to_thread=send,
+                set_thread_pinned=lambda thread_id, value: pinned.append((thread_id, value)),
+                set_thread_archived=lambda thread_id, value: archived.append((thread_id, value)),
+            )
+
+            result = adapter.rollover_ceo(manager, self._ceo_snapshot())
+
+            self.assertEqual(result["status"], "activated")
+            self.assertEqual(manager.status()["active_thread_id"], "ceo-new")
+            self.assertEqual(pinned, [("ceo-new", True), ("ceo-old", False)])
+            self.assertEqual(archived, [("ceo-old", True)])
+            self.assertEqual(adapter.supervisor_thread_id, "ceo-new")
+
+    def test_ceo_rollover_callback_failure_keeps_old_active_pointer(self):
+        with tempfile.TemporaryDirectory() as directory:
+            manager = CeoContinuityManager(directory)
+
+            def send(thread_id, prompt):
+                handoff = manager._read_handoff(manager.status()["pending_handoff"]["handoff_id"])
+                return {"verification": {
+                    "project_ids": ["P1"], "task_ids": ["T1"], "decision_ids": ["D1"],
+                    "risk_ids": ["R1"], "handoff_digest": handoff["digest"],
+                }}
+
+            def archive_fails(thread_id, value):
+                raise RuntimeError("host archive failed")
+
+            adapter = CodexAdapter(
+                supervisor_id="CEO-001",
+                supervisor_thread_id="ceo-old",
+                open_supervisor_thread=lambda ceo_id, metadata: {"thread_id": "ceo-new"},
+                send_to_thread=send,
+                set_thread_pinned=lambda thread_id, value: None,
+                set_thread_archived=archive_fails,
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "archive failed"):
+                adapter.rollover_ceo(manager, self._ceo_snapshot())
+            self.assertEqual(manager.status()["active_thread_id"], "ceo-old")
+
+    def test_ceo_rollover_retry_reuses_pending_candidate_thread(self):
+        with tempfile.TemporaryDirectory() as directory:
+            manager = CeoContinuityManager(directory)
+            opened = []
+            response_count = 0
+
+            def open_supervisor(ceo_id, metadata):
+                opened.append(metadata)
+                return {"thread_id": "ceo-new"}
+
+            def send(thread_id, prompt):
+                nonlocal response_count
+                response_count += 1
+                if response_count == 1:
+                    return {"status": "accepted"}
+                handoff = manager._read_handoff(manager.status()["pending_handoff"]["handoff_id"])
+                return {"verification": {
+                    "project_ids": ["P1"], "task_ids": ["T1"], "decision_ids": ["D1"],
+                    "risk_ids": ["R1"], "handoff_digest": handoff["digest"],
+                }}
+
+            adapter = CodexAdapter(
+                supervisor_id="CEO-001",
+                supervisor_thread_id="ceo-old",
+                open_supervisor_thread=open_supervisor,
+                send_to_thread=send,
+                set_thread_pinned=lambda thread_id, value: None,
+                set_thread_archived=lambda thread_id, value: None,
+            )
+
+            first = adapter.rollover_ceo(manager, self._ceo_snapshot())
+            second = adapter.rollover_ceo(manager, self._ceo_snapshot())
+
+            self.assertEqual(first["status"], "awaiting_candidate_verification")
+            self.assertEqual(second["status"], "activated")
+            self.assertEqual(len(opened), 1)
 
 
 if __name__ == "__main__":

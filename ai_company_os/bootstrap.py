@@ -31,6 +31,7 @@ GLOBAL_INTAKE_BLOCK = f"""{GLOBAL_INTAKE_BEGIN}
 - 需求清楚后，先列出理解结果、选用的 Skill/工具、工作流程、交付物、验收标准、成本控制和主要风险。只有这些内容齐全且 Skill/工具匹配完成后，才可以询问是否确认执行；不能只发一句“是否确认执行”。
 - 清晰、低风险、单步骤且可回退的查询、读取、状态检查和小修复可以直接执行；用户对当前方案说“继续”或“执行”视为批准该方案。
 - 单个任务留在当前对话；只有用户一次提交多个独立任务、明确要求并行，或存在跨项目资源冲突时，才启用 CEO/主管调度。
+- 当本对话承担 CEO 角色时，把 CEO 视为固定角色而不是永久线程：上下文低于 70% 正常工作，70%-85% 压缩已完成信息，85%-95% 准备结构化接班，达到 95% 或用户说“给 CEO 换一个新对话”时先完成接班；新 CEO 核对活动项目、未完成任务、活动决策和高风险项后再切换，旧对话归档。
 {GLOBAL_INTAKE_END}"""
 
 
@@ -305,12 +306,23 @@ def initialize_workspace(base_dir: str | Path, *, project: str = "main") -> dict
     crew_dir = root / ".makecrew"
     project_dir = crew_dir / "projects" / project_name
     project_dir.mkdir(parents=True, exist_ok=True)
+    (crew_dir / "handoffs").mkdir(parents=True, exist_ok=True)
 
     files = {
         crew_dir / "company-memory.md": "# Company Memory\n\n记录稳定偏好、质量规则、成本规则和公司级决策。\n",
         project_dir / "context-pack.md": f"# Project Context: {project_name}\n\n记录目标、路径、技术栈、约束和完成定义。\n",
         crew_dir / "tasks.json": "[]\n",
         crew_dir / "learning.json": '{"records": [], "proposals": []}\n',
+        crew_dir / "portfolio-index.json": '{"projects": []}\n',
+        crew_dir / "decision-log.jsonl": "",
+        crew_dir / "ceo-continuity.json": json.dumps({
+            "version": 1,
+            "ceo_id": "CEO-001",
+            "active_thread_id": "",
+            "generation": 0,
+            "threads": [],
+            "pending_handoff": None,
+        }, ensure_ascii=False, indent=2) + "\n",
     }
     created = []
     for path, content in files.items():
@@ -389,6 +401,9 @@ def register_employee(
             "status": str(profile.get("status", "active")),
             "kind": "custom",
         }
+        for field in ("tool_policy", "tool_discovery", "confirmation_required_for"):
+            if field in profile:
+                record[field] = profile[field]
     if not employee_id or not record["name"] or not record["department"]:
         raise ValueError("自定义员工至少需要 employee_id、name 和 department")
     if employee_id in CORE_EMPLOYEE_PROFILES or employee_id in registry:

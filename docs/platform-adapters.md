@@ -50,6 +50,27 @@ summary = adapter.summarize(scheduler)
 身份、已接通的宿主回调、缺失项和并发建议。该检查不创建 Agent、不发送消息，
 适合安装或重启后先做一次连接自检。
 
+### CEO 线程轮换适配器
+
+CEO 接班需要宿主额外绑定 `open_supervisor_thread`、`set_thread_pinned` 和 `set_thread_archived`。MakeCrew 内核生成和校验接班包；宿主负责真实的新建、置顶和归档动作：
+
+```python
+from ai_company_os import CeoContinuityManager, CodexAdapter
+
+continuity = CeoContinuityManager("WORKSPACE")
+adapter = CodexAdapter(
+    supervisor_id="CEO-001",
+    supervisor_thread_id="OLD_THREAD_ID",
+    send_to_thread=host.send_to_thread,
+    open_supervisor_thread=host.open_supervisor_thread,
+    set_thread_pinned=host.set_thread_pinned,
+    set_thread_archived=host.set_thread_archived,
+)
+result = adapter.rollover_ceo(continuity, current_state_snapshot)
+```
+
+`send_to_thread` 的结果应包含 `verification` 对象，字段为 `project_ids`、`task_ids`、`decision_ids`、`risk_ids` 和 `handoff_digest`。回调缺失时返回 `pending_host_adapter`；新线程未返回校验时返回 `awaiting_candidate_verification`。这两种状态都不会切换本地活动 CEO 指针。宿主不应把本地接班文件存在当成线程已创建的证据。
+
 ## Claude
 
 - 将 CEO 或岗位提示词放入 Project Instructions。

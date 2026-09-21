@@ -23,10 +23,30 @@ from ai_company_os.intake import plan_batch, plan_request
 from ai_company_os.batch import BatchScheduler
 from ai_company_os.capabilities import EMPLOYEE_SKILL_MATRIX, audit_employee_capabilities
 from ai_company_os.workflow import build_workflow, ready_nodes
-from ai_company_os.discovery import audit_method_catalog, discover_methods
+from ai_company_os.discovery import audit_method_catalog, discover_methods, inventory_external_skill_package
+from ai_company_os.capabilities import tool_policy_for_employee
 
 
 class RouteTaskTests(unittest.TestCase):
+    def test_product_manager_can_use_all_enabled_host_tools_policy(self):
+        policy = tool_policy_for_employee({"tools": ["*"], "tool_policy": "all_enabled_host_tools"})
+        self.assertEqual(policy["mode"], "all_enabled_host_tools")
+        self.assertTrue(policy["requires_runtime_inventory"])
+
+    def test_external_skill_inventory_is_metadata_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            skill_dir = Path(directory) / "skills" / "example"
+            skill_dir.mkdir(parents=True)
+            (skill_dir / "SKILL.md").write_text(
+                "---\nname: example\ndescription: Example capability\n---\nsecret instructions\n",
+                encoding="utf-8",
+            )
+            result = inventory_external_skill_package(directory)
+            self.assertEqual(result["status"], "ok")
+            self.assertEqual(result["skill_count"], 1)
+            self.assertFalse(result["content_loaded"])
+            self.assertNotIn("secret instructions", str(result))
+
     def test_every_builtin_employee_has_a_skill_matrix_and_role_contract(self):
         report = audit_employee_capabilities()
 
@@ -364,6 +384,22 @@ class BootstrapTests(unittest.TestCase):
             self.assertEqual(registry["MKT-001"]["kind"], "custom")
             with self.assertRaises(ValueError):
                 register_employee(directory, {"employee_id": "CEO-001", "name": "替换", "department": "管理"}, approved=True)
+
+    def test_custom_employee_persists_all_tools_policy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            initialize_workspace(directory)
+            register_employee(directory, {
+                "employee_id": "PM-PRODUCT-001",
+                "name": "产品经理",
+                "department": "产品部",
+                "tools": ["*"],
+                "tool_policy": "all_enabled_host_tools",
+                "tool_discovery": "inspect_before_use",
+                "confirmation_required_for": ["external_publish"],
+            }, approved=True)
+            registry = json.loads(Path(directory, ".makecrew", "employee-registry.json").read_text(encoding="utf-8"))
+            self.assertEqual(registry["PM-PRODUCT-001"]["tools"], ["*"])
+            self.assertEqual(registry["PM-PRODUCT-001"]["tool_policy"], "all_enabled_host_tools")
 
     def test_register_employee_requires_explicit_approval(self):
         with tempfile.TemporaryDirectory() as directory:

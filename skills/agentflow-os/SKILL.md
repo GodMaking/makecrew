@@ -1,6 +1,6 @@
 ---
 name: agentflow-os
-description: Compatibility entry for MakeCrew, an adaptive open-source AI work framework that clarifies vague requests, matches installed Skills and methods, routes work to the right Agent, preserves project memory, verifies delivery, controls cost, and learns from evidence.
+description: Compatibility entry for MakeCrew, an adaptive AI work framework that clarifies vague requests, matches installed Skills and methods, routes work to the right Agent, preserves project memory, verifies delivery, controls cost, and learns from evidence.
 ---
 
 # AgentFlow OS Compatibility Entry
@@ -70,6 +70,13 @@ On Codex, use the bundled `CodexAdapter` to map the parent Agent to the
 supervisor and native child Agents to employees. Host callbacks create/reuse
 threads, send compact packets, and return structured results; missing callbacks
 remain explicitly queued.
+
+The `CEO-001` role may rotate across host threads. At 85% context usage prepare
+a compact handoff; at 95% complete it before complex work. The phrase
+`给 CEO 换一个新对话` triggers the same flow. Use `CeoContinuityManager` and
+`CodexAdapter.rollover_ceo()` so the candidate verifies active project, task,
+decision, high-risk IDs, and the handoff digest before the active pointer moves.
+Never carry the full transcript into the new CEO thread.
 
 ## P0 quality and recovery
 

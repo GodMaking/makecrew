@@ -48,6 +48,7 @@ CEO/root（需要时） -> 主管 Agent -> 员工 Agent 1/2/3 -> 主管汇总 ->
 - **随时组建专属团队**：新建一个对话并指定它做主管，主管会按这组任务创建或调用对应员工，分头执行后统一反馈。
 - **结果可核验**：重要交付经过独立验收，保留测试、来源、预览、风险和失败原因，不把“生成计划”当成“完成工作”。
 - **项目可持续**：复用项目员工线程和上下文，只传任务差量；中断后可从检查点继续，降低重复输入和 Token 浪费。
+- **CEO 对话可接班**：CEO 是固定角色，不是永久占用同一个对话；上下文接近上限时生成紧凑接班包，由新对话校验后接管。
 - **越用越稳**：差评、返工、验收失败或重复问题才触发自进化提案，先用历史任务回放验证，再决定是否采用。
 
 ## 适合谁
@@ -77,6 +78,8 @@ MakeCrew 主要为刚开始使用 AI 的人设计。你不需要先学会复杂�
 - **员工对话**：适合一个明确任务，直接负责执行和交付。
 
 你可以为不同项目随时新建不同主管，让每个主管拥有独立的员工和项目上下文。主管需要增加员工时，先说明理由、职责、Skill、工具、记忆范围和成本，得到同意后才创建。
+
+CEO 也不依赖一个永久对话。MakeCrew 会根据宿主提供的 Token 使用量判断上下文压力：低于 70% 正常工作，70%-85% 压缩已完成信息，85%-95% 准备接班，达到 95% 后先完成接班再接收复杂任务。用户也可以直接说“给 CEO 换一个新对话”。旧 CEO 只导出项目、未完成任务、活动决策、员工状态、风险、预算、下一步和证据引用；新 CEO 核对这些状态后才成为活动 CEO，旧对话随后归档。
 
 ### 随时新建主管，处理不同任务
 
@@ -108,6 +111,8 @@ docs/getting-started.md 和 docs/platform-adapters.md。
 等我明确同意后再创建。执行后报告结果、文件或链接、验收证据、已知限制、成本和下一步。
 用清晰单任务、本地缺 Skill、模糊需求、多任务批次四项测试验证安装，
 没有真实安装或执行证据的能力标记为“待宿主配置”。
+把 CEO 视为固定角色而不是永久对话：配置上下文占用监测，达到阈值时生成结构化接班包，
+新 CEO 校验活动项目、未完成任务、决策和高风险项后再切换；宿主未绑定新建、置顶、归档回调时只报告待配置。
 ```
 
 **MakeCrew** 是一个跨平台、模型无关的 AI 工作框架：把自然语言需求变成可澄清、可路由、可协作、可验收、可恢复、可改进的工作。它先检查本地已安装的 Skill 和方法，本地匹配直接使用；缺少关键能力时再搜索候选并交给用户选择。单任务留在当前对话内，只有多任务、依赖或跨项目决策才启用主管/CEO 调度。
@@ -134,6 +139,7 @@ MakeCrew 的核心价值是：**让每个任务使用刚好够的 AI 能力、�
 | 一个任务动态组队 | 需要 1 种能力就用 1 个专家，需要多种能力就在当前对话组建专家组 | 多领域路由、并行节点、统一验收合约 |
 | 多任务真正并发 | 一次提交多个任务时，CEO 统一拆分、排依赖、限并发和汇总 | `BatchScheduler`、显式依赖图、动态并发上限 |
 | 长期项目不丢记忆 | 同一项目优先复用原员工线程，稳定背景与当前进度分层保存，并按任务需要自适应召回 | 项目上下文包、`(employee_id, project)` 线程复用、作用域 RAG |
+| CEO 上下文满了也能继续 | CEO 身份固定，承载它的对话可按代次轮换；只传当前有效状态和引用 | 上下文阈值、SHA-256 接班包、覆盖校验、原子活动指针 |
 | 跨员工传递更省 Token | 只传新增结论、证据、风险和下一步，减少整段历史重复输入 | 差量交接模板、最小任务包、成本可见原则 |
 | 员工能力可检查 | 每个岗位的 Skill、工具、记忆范围和输出合约都可核验 | 稳定员工 ID、能力矩阵、`makecrew capability-audit` |
 | 交付前独立验收 | 以测试、来源、预览、风险和验收标准判断结果 | `QA-001`、验收门禁、独立 QA 任务 |
@@ -477,6 +483,19 @@ python -m ai_company_os.web
 
 MVP 负责把自然语言任务转换成可检查的协作计划，并通过 `CrewOrchestrator` 把任务交给宿主平台提供的员工执行器。它不绑定模型、不上传任务文本；没有配置执行器时会明确返回 `queued`，不会把计划冒充成交付。按 `docs/platform-adapters.md` 接入自己的工具层即可连接真实员工对话。
 
+### 借鉴外部 Skill 包
+
+MakeCrew 可以把 dbskill 等外部 Skill 包作为可选能力源：先扫描各目录 `SKILL.md` 的名称和描述用于本地路由，命中后才按宿主规则加载正文，并保留来源、路径、许可证和用户确认状态。仓库不会复制第三方源码、提示词或知识原文，也不会因为扫描到候选就自动安装或执行。Python API：
+
+```python
+from ai_company_os.discovery import inventory_external_skill_package
+
+catalog = inventory_external_skill_package("/path/to/dbskill")
+# catalog["skills"]: metadata-only candidates; catalog["content_loaded"] is False
+```
+
+因此，dbskill 的动态入口、知识库治理、内容资产化和来源追踪等公开机制可以进入 MakeCrew 的候选方法层，同时继续使用 MakeCrew 的单任务短路径、用户确认、项目作用域、验收和可恢复调度。
+
 后续版本可以在这个稳定核心上增加模型适配器、员工状态同步和真实的并行执行器。员工数量、岗位名称和平台工具由使用者按实际工作扩展。
 
 ### 多线程批次调度
@@ -500,6 +519,37 @@ scheduler = BatchScheduler(thread_adapter=open_thread)
 
 CLI 的 `batch-dispatch` 会输出本批次的 `dispatches` 和
 `execution: host_adapter_required`；真实 Agent 创建、消息发送和结果回写由适配器负责。
+
+### CEO 对话接班
+
+`CeoContinuityManager` 把 CEO 身份与聊天线程分开。先用宿主提供的 Token 统计判断压力，再生成接班包并完成新线程校验：
+
+```bash
+makecrew ceo-assess --path WORKSPACE --used-tokens 85000 --context-window 100000
+makecrew ceo-prepare-handoff --path WORKSPACE --current-thread THREAD_ID --snapshot snapshot.json
+makecrew ceo-register-candidate --path WORKSPACE --thread NEW_THREAD_ID --handoff CEO-HANDOFF-000002
+makecrew ceo-verify --path WORKSPACE --thread NEW_THREAD_ID --handoff CEO-HANDOFF-000002 --verification verification.json
+makecrew ceo-activate --path WORKSPACE --thread NEW_THREAD_ID --handoff CEO-HANDOFF-000002
+```
+
+`snapshot.json` 只接收 `company_memory_ref`、`portfolio`、`open_tasks`、`active_decisions`、`employee_status`、`risks`、`budgets`、`next_actions` 和 `evidence_refs`。其他字段不会进入接班包。`ceo-activate` 只有在摘要、项目、任务、决策和高风险项校验全部通过后才更新活动指针。同一时间只保留一个活动 CEO。
+
+### 项目控制塔
+
+对于汽车新车型、企业软件交付等长周期项目，使用 `ProjectControlTower` 管理项目主计划，而不是把所有工作平铺成聊天任务。节点可以声明前置依赖、工期、里程碑、预算和员工资源；控制塔会计算关键路径和浮动时间，并汇总预算超限、资源冲突和高影响风险。
+
+```python
+from ai_company_os import ProjectControlTower, ProjectNode
+
+tower = ProjectControlTower("customer-software", path=".makecrew/projects/customer-software/control.json")
+tower.add_node(ProjectNode("requirements", "需求确认", duration=3, resources=["产品经理"]))
+tower.add_node(ProjectNode("development", "研发开发", duration=10, depends_on=["requirements"], resources=["研发工程师"]))
+tower.add_node(ProjectNode("acceptance", "测试与客户验收", duration=5, depends_on=["development"], milestone=True))
+tower.set_budget(100)
+print(tower.health())
+```
+
+CEO 只需查看 `health()` 的关键路径、延期影响、预算、资源冲突和风险；员工继续通过现有 `BatchScheduler` 执行具体节点。控制塔是项目级决策层，调度器是任务级执行层。
 
 Codex 优先使用仓库内的 `CodexAdapter`：它把父 Agent 记录为主管，把每个
 原生子 Agent 记录为员工，首次派发调用 `spawn_subagent(prompt, metadata)`，
