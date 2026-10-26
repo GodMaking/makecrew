@@ -82,10 +82,41 @@ exactly-once 保证。回调异常会留下 trace 并把任务置为 `waiting_ho
 批次状态可由 `BatchScheduler.restore(state_path, ...)` 重建；宿主需重新绑定回调并负责
 外部副作用去重。
 
-当前 `CodexAdapter` 是完整请求/回执边界：宿主应先组装好完整工具参数，再返回
-结构化回执；MakeCrew 当前没有厂商级流式事件解析器，也没有第二个厂商原生模型适配器。
-新增流式或其他厂商适配器时，应为其单独补充增量参数拼接、截断/中断、重复事件去重和最终
-回执映射测试；本节的 Codex 回调测试仅覆盖 Codex 边界，不代表其他协议已验证。
+当前 `CodexAdapter` 仍是完整请求/回执边界；另有两个不发请求的协议事件适配器，用于将 OpenAI Responses 与 Anthropic Messages 的实际流事件归一化。它们不替代 Codex 回调，也不是厂商 SDK 或完整模型客户端。
+
+### OpenAI Responses 与 Anthropic Messages 工具流
+
+OpenAI 官方 Responses 流使用 `response.output_item.added` 提供 function-call 的 item/call 身份，使用 `response.function_call_arguments.delta` 发送参数片段，并以 `response.function_call_arguments.done` 提供最终参数；事件带 `sequence_number`。该 `done` 事件本身不放行工具：它也可能出现在中断或不完整响应中。`OpenAIResponsesToolStreamAdapter` 按 response ID 与序号去重增量，并校验最终参数字符串和累计片段一致；只有收到成功的 `response.completed` 后才返回可路由调用列表。
+
+Anthropic 官方 Messages 流以 `message_start`、`content_block_start`、`content_block_delta` 和 `content_block_stop` 表示消息及工具块生命周期；`input_json_delta.partial_json` 是片段，块结束时才解析。`AnthropicMessagesToolStreamAdapter` 只接收 `tool_use` 客户端工具块，忽略文字、thinking、`server_tool_use` 和未知事件；`error` 事件会显式报错。块结束仍不放行工具，只有完整 `message_stop` 且最终 `stop_reason` 为 `tool_use` 才返回工具调用列表。该事件格式没有文档化的逐事件序号，因此 adapter 使用进程内生成的事件 ID，宿主需将每个 SSE 事件投递一次；若消息中途断开，就重启整个任务，不将重放片段拼接到现有 adapter，也不把半截 JSON 当成可执行参数。
+
+```python
+from ai_company_os import (
+    AnthropicMessagesToolStreamAdapter,
+    OpenAIResponsesToolStreamAdapter,
+)
+
+openai_stream = OpenAIResponsesToolStreamAdapter()
+for event in openai_event_dicts:
+    calls = openai_stream.feed(event)
+    if calls is not None:  # 仅 response.completed 会返回工具调用
+        for call in calls:
+            # 宿主再按工具 schema、权限策略及副作用幂等规则检查后路由。
+            route_validated_tool_call(call)
+openai_stream.finish()  # 缺少成功终止事件或参数未完成时会抛 IncompleteToolCallError
+
+anthropic_stream = AnthropicMessagesToolStreamAdapter()
+for event in anthropic_event_dicts:
+    calls = anthropic_stream.feed(event)
+    if calls is not None:  # 仅完整 message_stop 会返回工具调用
+        for call in calls:
+            route_validated_tool_call(call)
+anthropic_stream.finish()
+```
+
+两个 adapter 均只接收已解码的字典事件，不联网、不执行工具，也不代替宿主做 JSON Schema、权限或业务校验。任何流式中断时，宿主应丢弃该次 adapter 内的部分参数；用 `BatchScheduler.restore(state_path, ...)` 恢复已保存的任务状态，再以原 `run_id:task_id` 幂等键重派任务。OpenAI 可用 response ID 与 `sequence_number` 识别同一流中的重复事件；Anthropic 当前 adapter 没有稳定的逐事件重放去重，重试整条任务并由宿主对外部副作用按任务幂等键去重。
+
+协议字段依据官方文档（查阅日期：2026-10-26）：[OpenAI Responses streaming events](https://platform.openai.com/docs/api-reference/responses-streaming)、[Anthropic Messages streaming](https://docs.anthropic.com/en/api/messages-streaming)。
 
 ### 规范化增量工具参数
 
@@ -118,8 +149,7 @@ assembler.finish()  # 若流中断且仍有未完成调用，会报告 pending c
 事件需带稳定 `event_id` 与 `call_id`。相同 ID、相同内容的事件会去重；同 ID 不同内容会报错。
 多个调用可以交错到达，各自独立累积。参数需在完成事件到达时解析为 JSON 对象，否则不会产出
 可路由调用。该组件只拼装和验证规范化事件，不解析任何厂商协议、不执行工具，也不替代宿主
-的工具调用幂等处理。当前 Codex 回调仍使用完整请求/回执；以下契约供新流式适配器使用，尚不
-表示已接入或验证了第二个模型供应商。
+的工具调用幂等处理。Codex 完整请求/回执边界与上面的两个模型协议事件适配器各自独立。
 
 也可以先运行 `makecrew codex-audit --supervisor-id PM-001`，查看当前主管
 身份、已接通的宿主回调、缺失项和并发建议。该检查不创建 Agent、不发送消息，

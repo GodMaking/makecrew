@@ -4,6 +4,8 @@ import unittest
 from pathlib import Path
 
 from ai_company_os.batch import BatchScheduler
+from ai_company_os.provider_streams import OpenAIResponsesToolStreamAdapter
+from ai_company_os.tool_stream import IncompleteToolCallError
 
 
 class BatchPersistenceTests(unittest.TestCase):
@@ -102,6 +104,60 @@ class BatchPersistenceTests(unittest.TestCase):
             self.assertEqual(verified.snapshot("T1")["qa"]["status"], "passed")
             self.assertEqual(verified.snapshot("T1")["qa"]["evidence_refs"], ["reports/qa.json"])
             self.assertEqual(verified.dispatch_ready(), [])
+
+    def test_interrupted_provider_stream_retries_task_without_replaying_partial_tool_call(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state_path = Path(directory) / "stream-recovery.json"
+            attempts = []
+            executed_calls = []
+
+            def dispatch(_thread_id, task_packet):
+                attempts.append(task_packet["idempotency_key"])
+                adapter = OpenAIResponsesToolStreamAdapter()
+                adapter.feed({"type": "response.created", "sequence_number": 0, "response": {"id": f"r-{len(attempts)}"}})
+                adapter.feed({
+                    "type": "response.output_item.added", "sequence_number": 1, "item_id": "item-1",
+                    "item": {"type": "function_call", "id": "item-1", "call_id": f"call-{len(attempts)}", "name": "write_file"},
+                })
+                adapter.feed({
+                    "type": "response.function_call_arguments.delta", "sequence_number": 2,
+                    "item_id": "item-1", "delta": '{"path":"out.txt",',
+                })
+                if len(attempts) == 1:
+                    with self.assertRaises(IncompleteToolCallError):
+                        adapter.finish()
+                    raise ConnectionError("stream disconnected before final arguments")
+
+                adapter.feed({
+                    "type": "response.function_call_arguments.delta", "sequence_number": 3,
+                    "item_id": "item-1", "delta": '"content":"complete"}',
+                })
+                adapter.feed({
+                    "type": "response.function_call_arguments.done", "sequence_number": 4,
+                    "item_id": "item-1", "call_id": "call-2", "name": "write_file",
+                    "arguments": '{"path":"out.txt","content":"complete"}',
+                })
+                completed = adapter.feed({
+                    "type": "response.completed", "sequence_number": 5,
+                    "response": {"id": f"r-{len(attempts)}", "status": "completed"},
+                })
+                executed_calls.extend(completed or [])
+                return {"status": "accepted", "thread_id": "worker-thread", "run_id": f"host-{len(attempts)}"}
+
+            first = BatchScheduler(run_id="stream-resume", state_path=state_path, agent_dispatcher=dispatch)
+            first.add("生成文件", task_id="T1", project="demo")
+            with self.assertRaisesRegex(ConnectionError, "stream disconnected"):
+                first.dispatch_ready()
+            self.assertEqual(first.snapshot("T1")["status"], "waiting_host")
+            self.assertEqual(executed_calls, [])
+
+            resumed = BatchScheduler.restore(state_path, agent_dispatcher=dispatch)
+            retried = resumed.dispatch_ready()[0]
+
+            self.assertEqual(attempts, ["stream-resume:T1", "stream-resume:T1"])
+            self.assertEqual(retried["idempotency_key"], "stream-resume:T1")
+            self.assertEqual(len(executed_calls), 1)
+            self.assertEqual(executed_calls[0]["arguments"], {"path": "out.txt", "content": "complete"})
 
     def test_existing_state_path_requires_explicit_restore(self):
         with tempfile.TemporaryDirectory() as directory:
