@@ -17,6 +17,7 @@ from .skill_audit import audit_skill_directory, inventory_skill_directory
 from .rag import RetrievalScope
 from .rag_store import JsonRagIndex, plan_directory
 from .ceo_continuity import CeoContinuityManager
+from .qa_regression import evaluate_qa_regression_results, export_qa_regression_cases
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -135,6 +136,7 @@ def main(argv: list[str] | None = None) -> int:
     batch_dispatch.add_argument("--supervisor-id", default="PM-001", help="parent supervisor Agent ID")
     batch_dispatch.add_argument("--max-concurrency", type=int, default=3, help="maximum running tasks")
     batch_dispatch.add_argument("--total-tool-calls", type=int, default=None, help="batch tool-call budget")
+    batch_dispatch.add_argument("--trace-path", default=None, help="append compact JSONL run events to this path")
     batch_dispatch.add_argument(
         "--depends-on", action="append", default=[], metavar="TASK_ID=DEP1,DEP2",
         help="declare dependencies; repeat once per task (dependencies must appear earlier)",
@@ -143,6 +145,13 @@ def main(argv: list[str] | None = None) -> int:
         "--task-budget", action="append", default=[], metavar="TASK_ID=N",
         help="set a per-task tool-call budget; repeat as needed",
     )
+
+    qa_regression = subparsers.add_parser(
+        "qa-regression", help="export blinded QA cases or score candidate verdicts against the fixed suite"
+    )
+    qa_regression_action = qa_regression.add_mutually_exclusive_group(required=True)
+    qa_regression_action.add_argument("--export-cases", metavar="PATH", help="create a new blinded case-pack JSON file")
+    qa_regression_action.add_argument("--results", metavar="PATH", help="score a JSON file containing a results array")
 
     ceo_status = subparsers.add_parser("ceo-status", help="show durable CEO generation and handoff state")
     ceo_status.add_argument("--path", default=".", help="MakeCrew workspace directory")
@@ -262,6 +271,7 @@ def main(argv: list[str] | None = None) -> int:
             max_concurrency=args.max_concurrency,
             total_tool_calls=args.total_tool_calls,
             supervisor_id=args.supervisor_id,
+            trace_path=args.trace_path,
         )
         dependencies = _parse_assignments(args.depends_on, "依赖")
         budgets = _parse_assignments(args.task_budget, "任务预算")
@@ -276,7 +286,22 @@ def main(argv: list[str] | None = None) -> int:
         result["dispatches"] = scheduler.dispatch_ready()
         result["tasks"] = scheduler.plan()["tasks"]
         result["overview"] = scheduler.overview()
+        result["trace_events"] = scheduler.trace_events()
         result["execution"] = "host_adapter_required"
+    elif args.command == "qa-regression":
+        if args.export_cases:
+            output_path = Path(args.export_cases).expanduser()
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            case_pack = export_qa_regression_cases()
+            try:
+                with output_path.open("x", encoding="utf-8", newline="\n") as output_file:
+                    json.dump(case_pack, output_file, ensure_ascii=False, indent=2)
+                    output_file.write("\n")
+            except FileExistsError as exc:
+                raise SystemExit(f"输出文件已存在，保留原文件：{output_path}") from exc
+            result = {"status": "exported", "case_count": len(case_pack["cases"]), "path": str(output_path)}
+        else:
+            result = evaluate_qa_regression_results(_read_json_object(args.results, "QA 回归结果"))
     elif args.command == "ceo-status":
         result = CeoContinuityManager(args.path).status()
     elif args.command == "ceo-assess":

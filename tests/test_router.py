@@ -917,6 +917,92 @@ class IntakePlannerTests(unittest.TestCase):
 
 
 class BatchSchedulerTests(unittest.TestCase):
+    def test_execution_trace_links_hierarchy_host_model_artifacts_and_qa(self):
+        with tempfile.TemporaryDirectory() as directory:
+            trace_path = Path(directory) / "run.jsonl"
+
+            def dispatch(thread_id, task_packet):
+                return {
+                    "status": "accepted",
+                    "thread_id": thread_id or "employee-thread",
+                    "run_id": "host-run-1",
+                    "model": "fixture-model",
+                }
+
+            scheduler = BatchScheduler(
+                supervisor_id="PM-DEMO",
+                run_id="run-001",
+                trace_path=trace_path,
+                agent_dispatcher=dispatch,
+            )
+            scheduler.add("父任务标题不应写入日志", task_id="P1", project="demo")
+            scheduler.add(
+                "子任务标题不应写入日志",
+                task_id="C1",
+                project="demo",
+                parent_task_id="P1",
+                depends_on=["P1"],
+            )
+
+            dispatches = scheduler.dispatch_ready()
+            self.assertEqual(dispatches[0]["run_id"], "run-001")
+            self.assertEqual(dispatches[0]["task_packet"]["parent_task_id"], "")
+            scheduler.mark_done("P1", result={"summary": "完成", "artifact_refs": ["docs/prd.md"]})
+            scheduler.record_qa(
+                "P1",
+                status="rework_required",
+                reason="缺少验收证据",
+                agent_id="QA-001",
+                model="qa-fixture-model",
+                evidence_refs=["reports/qa.md"],
+            )
+
+            events = [json.loads(line) for line in trace_path.read_text(encoding="utf-8").splitlines()]
+            child_created = next(event for event in events if event["event_type"] == "task_created" and event["task_id"] == "C1")
+            host_dispatch = next(event for event in events if event["event_type"] == "host_dispatch_result")
+            completed = next(event for event in events if event["event_type"] == "task_completed")
+            qa = next(event for event in events if event["event_type"] == "qa_reviewed")
+
+            self.assertEqual(child_created["run_id"], "run-001")
+            self.assertEqual(child_created["parent_task_id"], "P1")
+            self.assertEqual(host_dispatch["model"], "fixture-model")
+            self.assertEqual(host_dispatch["host_run_id"], "host-run-1")
+            self.assertEqual(completed["artifact_refs"], ["docs/prd.md"])
+            self.assertEqual(qa["qa_status"], "rework_required")
+            self.assertEqual(qa["status"], "review")
+            self.assertEqual(qa["qa_rework_count"], 1)
+            self.assertEqual(qa["qa_reason"], "缺少验收证据")
+            self.assertEqual(qa["qa_evidence_refs"], ["reports/qa.md"])
+            serialized = trace_path.read_text(encoding="utf-8")
+            self.assertNotIn("父任务标题不应写入日志", serialized)
+            self.assertNotIn("子任务标题不应写入日志", serialized)
+
+    def test_execution_trace_rejects_unknown_parent_task(self):
+        scheduler = BatchScheduler(run_id="run-001")
+        with self.assertRaisesRegex(ValueError, "父任务不存在"):
+            scheduler.add("子任务", task_id="C1", parent_task_id="missing")
+
+    def test_execution_trace_ignores_null_artifact_refs(self):
+        result = BatchScheduler._normalize_result({"summary": "完成", "artifact_refs": None})
+        self.assertEqual(result["artifact_refs"], [])
+
+    def test_execution_trace_records_host_dispatch_error_and_keeps_task_retryable(self):
+        def dispatch(_thread_id, _task_packet):
+            raise RuntimeError("fixture dispatch failure")
+
+        scheduler = BatchScheduler(run_id="run-error", agent_dispatcher=dispatch)
+        scheduler.add("执行任务", task_id="T1")
+
+        with self.assertRaisesRegex(RuntimeError, "fixture dispatch failure"):
+            scheduler.dispatch_ready()
+
+        snapshot = scheduler.snapshot("T1")
+        error = next(event for event in scheduler.trace_events() if event["event_type"] == "host_dispatch_error")
+        self.assertEqual(snapshot["status"], "waiting_host")
+        self.assertEqual(error["run_id"], "run-error")
+        self.assertEqual(error["status"], "waiting_host")
+        self.assertIn("fixture dispatch failure", error["reason"])
+
     def test_batch_declares_supervisor_and_employee_agent_contract(self):
         scheduler = BatchScheduler(max_concurrency=2, supervisor_id="PM-DEMO")
         scheduler.add("研究用户", task_id="T1", project="demo")

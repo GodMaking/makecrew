@@ -7,7 +7,7 @@ from .bootstrap import audit_tools, doctor_workspace, initialize_workspace, inst
 from .orchestrator import CrewOrchestrator
 from .intake import plan_request, plan_batch
 from .batch import AgentDispatcher, BatchScheduler
-from .codex_adapter import CodexAdapter, CodexAgentRef, CodexHost, build_employee_prompt, build_supervisor_prompt
+from .codex_adapter import CodexAdapter, CodexAgentRef, CodexHost, build_employee_prompt, build_qa_prompt, build_supervisor_prompt
 from .workflow import build_workflow, ready_nodes
 from .capabilities import EMPLOYEE_SKILL_MATRIX, audit_employee_capabilities, skill_ids_for_employee
 from .discovery import audit_method_catalog, discover_methods, resolve_skills, inventory_external_skill_package
@@ -19,5 +19,7 @@ from .rag_identity import scope_for_employee, scope_payload
 from .skill_audit import audit_skill_directory, audit_skill_file, inventory_skill_directory
 from .checkpoint import JsonCheckpointStore, RetryPolicy
 from .ceo_continuity import CeoContinuityManager, build_ceo_handoff_prompt
+from .qa_regression import evaluate_qa_regression_results, export_qa_regression_cases, qa_regression_cases
+from .tool_stream import IncompleteToolCallError, ToolCallDeltaAssembler
 
-__all__ = ["route_task", "TaskLedger", "TaskStatus", "LearningEngine", "ProposalStatus", "audit_tools", "doctor_workspace", "initialize_workspace", "install_codex_global_intake", "register_employee", "CrewOrchestrator", "plan_request", "plan_batch", "AgentDispatcher", "BatchScheduler", "CodexAdapter", "CodexAgentRef", "CodexHost", "build_employee_prompt", "build_supervisor_prompt", "build_workflow", "ready_nodes", "EMPLOYEE_SKILL_MATRIX", "audit_employee_capabilities", "skill_ids_for_employee", "tool_policy_for_employee", "resolve_employee_tools", "audit_method_catalog", "discover_methods", "resolve_skills", "inventory_external_skill_package", "ProjectControlTower", "ProjectNode", "KnowledgeRecord", "RetrievalScope", "RetrievalHit", "Retriever", "SemanticScorer", "HybridRetriever", "HostRagAdapter", "JsonRagIndex", "plan_directory", "sha256_file", "scope_for_employee", "scope_payload", "audit_skill_directory", "audit_skill_file", "inventory_skill_directory", "JsonCheckpointStore", "RetryPolicy", "CeoContinuityManager", "build_ceo_handoff_prompt"]
+__all__ = ["route_task", "TaskLedger", "TaskStatus", "LearningEngine", "ProposalStatus", "audit_tools", "doctor_workspace", "initialize_workspace", "install_codex_global_intake", "register_employee", "CrewOrchestrator", "plan_request", "plan_batch", "AgentDispatcher", "BatchScheduler", "CodexAdapter", "CodexAgentRef", "CodexHost", "build_employee_prompt", "build_qa_prompt", "build_supervisor_prompt", "build_workflow", "ready_nodes", "EMPLOYEE_SKILL_MATRIX", "audit_employee_capabilities", "skill_ids_for_employee", "tool_policy_for_employee", "resolve_employee_tools", "audit_method_catalog", "discover_methods", "resolve_skills", "inventory_external_skill_package", "ProjectControlTower", "ProjectNode", "KnowledgeRecord", "RetrievalScope", "RetrievalHit", "Retriever", "SemanticScorer", "HybridRetriever", "HostRagAdapter", "JsonRagIndex", "plan_directory", "sha256_file", "scope_for_employee", "scope_payload", "audit_skill_directory", "audit_skill_file", "inventory_skill_directory", "JsonCheckpointStore", "RetryPolicy", "CeoContinuityManager", "build_ceo_handoff_prompt", "qa_regression_cases", "export_qa_regression_cases", "evaluate_qa_regression_results", "ToolCallDeltaAssembler", "IncompleteToolCallError"]

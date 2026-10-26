@@ -12,8 +12,9 @@ import json
 from dataclasses import dataclass
 from typing import Any, Callable, Protocol
 
-from .capabilities import resolve_employee_tools, tool_policy_for_employee
+from .capabilities import resolve_employee_tools, skill_ids_for_employee, tool_policy_for_employee
 from .ceo_continuity import CeoContinuityManager, build_ceo_handoff_prompt
+from .router import CORE_EMPLOYEE_PROFILES
 
 
 SpawnSubagent = Callable[[str, dict[str, Any]], dict[str, Any]]
@@ -53,7 +54,7 @@ def build_employee_prompt(task_packet: dict[str, Any]) -> str:
         "你是 MakeCrew 的员工 Agent，只执行任务包中声明的范围。\n"
         "不要读取或复述无关员工的完整历史；只使用项目摘要和本次任务差量。\n"
         "先按任务包中的 tool_policy 枚举宿主本轮实际启用的工具；通配符只代表已启用工具，不代表虚构能力。\n"
-        "完成后必须返回 JSON：summary、evidence、risks、next_steps。\n"
+        "完成后必须返回 JSON：summary、evidence、risks、next_steps；如有文件或可复核产物，另列 artifact_refs 路径。\n"
         f"任务包：{_json(task_packet)}"
     )
 
@@ -64,6 +65,19 @@ def build_supervisor_prompt(aggregate: dict[str, Any]) -> str:
         "你是 MakeCrew 的项目主管 Agent。请根据员工差量汇总当前批次，\n"
         "指出已完成、未完成、证据、风险和下一步，不要补写员工未提供的事实。\n"
         f"批次差量：{_json(aggregate)}"
+    )
+
+
+def build_qa_prompt(review_packet: dict[str, Any]) -> str:
+    """Render an independent, evidence-first review prompt for a Codex QA Agent."""
+    return (
+        "你是 MakeCrew 的独立 QA 验收 Agent；你不参与被审任务的实现，也不继承执行员工的判断。\n"
+        "只按 acceptance_gates 检查本次交付及可访问证据；不要仅凭员工自述通过。\n"
+        "逐项核对验收标准，优先查看 artifact_refs 与 evidence；标出未覆盖标准、矛盾、不可复现项和风险。\n"
+        "仅返回 JSON：status (passed|rework_required|blocked)、reason、evidence_refs。\n"
+        "passed 必须附上可复核的 evidence_refs；rework_required/blocked 必须说明具体缺口或阻塞及对应证据。\n"
+        "不要自行修改产物。\n"
+        f"复核任务包：{_json(review_packet)}"
     )
 
 
@@ -247,12 +261,161 @@ class CodexAdapter:
         if isinstance(host_result, dict):
             result = host_result.get("result", host_result)
             status = str(host_result.get("status", "")).lower()
+            model = str(host_result.get("model", host_result.get("model_name", ""))).strip()
             if status in {"failed", "error"}:
                 reason = str(host_result.get("reason", host_result.get("error", "Codex 员工执行失败")))
-                return scheduler.mark_failed(task_id, reason=reason, usage=usage)
+                return scheduler.mark_failed(task_id, reason=reason, usage=usage, model=model)
         else:
             result = host_result
-        return scheduler.mark_done(task_id, result=result, usage=usage)
+            model = ""
+        return scheduler.mark_done(task_id, result=result, usage=usage, model=model)
+
+    def request_qa_review(self, scheduler: Any, task_id: str) -> dict[str, Any]:
+        """Dispatch a separate QA Agent and keep dependents behind the review gate.
+
+        The stable review ID is also sent as a host idempotency key: if the host
+        accepted a spawn but its acknowledgement was lost, retrying can safely
+        recover the same logical review instead of creating a second verdict.
+        """
+        task = scheduler.snapshot(task_id)
+        if self.spawn_subagent is None:
+            return {
+                "status": "queued",
+                "reason": "codex_spawn_adapter_required_for_qa",
+                "task": task,
+            }
+
+        worker_id = str(task.get("employee_id", "")).strip()
+        reviewer_id = "QA-001" if worker_id != "QA-001" else "QA-REVIEW-001"
+        task = scheduler.begin_qa_review(task_id, reviewer_id=reviewer_id)
+        review_id = str(task.get("qa_review_id", "")).strip()
+        profile = CORE_EMPLOYEE_PROFILES["QA-001"]
+        reviewer = {
+            "agent_id": reviewer_id,
+            "role": profile.name,
+            "department": profile.department,
+            "skills": skill_ids_for_employee("QA-001"),
+            "tools": list(profile.tools),
+            "memory_scope": profile.memory_scope,
+        }
+        tool_subject = {"tools": list(profile.tools)}
+        qa_packet = {
+            "review_id": review_id,
+            "run_id": task["run_id"],
+            "task_id": task["task_id"],
+            "project": task.get("project", ""),
+            "task": task["task"],
+            "acceptance_gates": task.get("acceptance_gates", []),
+            "employee_id": worker_id,
+            "employee_result": task.get("result"),
+            "artifact_refs": task.get("artifact_refs", []),
+            "file_scope": task.get("file_scope", []),
+        }
+        metadata = {
+            "agent_id": reviewer_id,
+            "agent_kind": "qa",
+            "independent_review": True,
+            "independent_of_agent_id": str(task.get("agent_id", worker_id)),
+            "supervisor_id": task.get("supervisor_id", self.supervisor_id),
+            "project": task.get("project", ""),
+            "role": profile.name,
+            "skills": reviewer["skills"],
+            "tools": resolve_employee_tools(tool_subject, self.available_tools)
+            if self.available_tools else list(profile.tools),
+            "tool_policy": tool_policy_for_employee(tool_subject),
+            "memory_scope": profile.memory_scope,
+            "file_scope": list(task.get("file_scope", [])),
+            "task_id": task_id,
+            "review_id": review_id,
+            "idempotency_key": review_id,
+            "isolation": "isolated_thread",
+        }
+        try:
+            response = self.spawn_subagent(build_qa_prompt(qa_packet), metadata)
+        except Exception as exc:
+            failed = scheduler.qa_review_failed(task_id, review_id, reason=f"{type(exc).__name__}: {exc}")
+            return {"status": "host_error", "reason": str(exc), "review_id": review_id, "task": failed}
+        response = response if isinstance(response, dict) else {"result": response}
+        status = str(response.get("status", "")).strip().lower()
+        if status in {"failed", "error", "rejected"}:
+            reason = str(response.get("reason", response.get("error", "Codex QA Agent 派发失败")))
+            failed = scheduler.qa_review_failed(task_id, review_id, reason=reason)
+            return {"status": "host_error", "reason": reason, "review_id": review_id, "host": response, "task": failed}
+        receipt = scheduler.record_qa_dispatch(
+            task_id,
+            review_id,
+            thread_id=str(response.get("thread_id", "")),
+            host_run_id=str(response.get("run_id", response.get("host_run_id", ""))),
+            model=str(response.get("model", response.get("model_name", ""))),
+            dispatch_status=status or ("accepted" if response.get("thread_id") or response.get("run_id") else "queued"),
+        )
+        return {
+            "status": status or ("accepted" if response.get("thread_id") or response.get("run_id") else "queued"),
+            "review_id": review_id,
+            "reviewer": reviewer,
+            "task": receipt,
+            "host": response,
+        }
+
+    def complete_qa_review(
+        self,
+        scheduler: Any,
+        task_id: str,
+        host_result: Any,
+        *,
+        review_id: str,
+    ) -> dict[str, Any]:
+        """Validate an asynchronous QA response and record its evidence-backed verdict."""
+        task = scheduler.snapshot(task_id)
+        if task.get("status") != "qa_review" or task.get("qa_review_id") != review_id:
+            raise ValueError(f"QA 回执已过期或与当前复核不匹配：{task_id}")
+        if isinstance(host_result, dict):
+            outer_status = str(host_result.get("status", "")).strip().lower()
+            if outer_status in {"failed", "error", "rejected"}:
+                reason = str(host_result.get("reason", host_result.get("error", "Codex QA Agent 执行失败")))
+                failed = scheduler.qa_review_failed(task_id, review_id, reason=reason)
+                return {"status": "host_error", "reason": reason, "task": failed}
+            verdict = host_result.get("result", host_result)
+            model = str(host_result.get("model", host_result.get("model_name", ""))).strip()
+            host_run_id = str(host_result.get("run_id", host_result.get("host_run_id", ""))).strip()
+            thread_id = str(host_result.get("thread_id", task.get("qa", {}).get("thread_id", ""))).strip()
+            host_agent_id = str(host_result.get("agent_id", "")).strip()
+        else:
+            verdict, model, host_run_id, thread_id, host_agent_id = host_result, "", "", "", ""
+        if isinstance(verdict, str):
+            try:
+                verdict = json.loads(verdict)
+            except json.JSONDecodeError:
+                verdict = None
+        if not isinstance(verdict, dict):
+            failed = scheduler.qa_review_failed(task_id, review_id, reason="QA 输出不是有效 JSON 对象")
+            return {"status": "invalid_result", "task": failed}
+        status = str(verdict.get("status", "")).strip().lower()
+        reason = str(verdict.get("reason", "")).strip()
+        raw_refs = verdict.get("evidence_refs", verdict.get("evidence", []))
+        refs = [str(item).strip() for item in raw_refs if str(item).strip()] if isinstance(raw_refs, (list, tuple)) else []
+        validation_error = ""
+        if status not in {"passed", "rework_required", "blocked"}:
+            validation_error = "QA 状态必须是 passed、rework_required 或 blocked"
+        elif status != "passed" and not reason:
+            validation_error = "QA 驳回或阻塞时必须说明具体原因"
+        elif status == "passed" and not refs:
+            validation_error = "QA 通过必须附可复核的 evidence_refs"
+        if validation_error:
+            failed = scheduler.qa_review_failed(task_id, review_id, reason=validation_error)
+            return {"status": "invalid_result", "reason": validation_error, "task": failed}
+        qa = task.get("qa", {})
+        updated = scheduler.record_qa(
+            task_id,
+            status=status,
+            reason=reason,
+            agent_id=str(verdict.get("agent_id", host_agent_id or qa.get("agent_id", "QA-001"))).strip(),
+            model=model or str(verdict.get("model", "")).strip() or str(qa.get("model", "")).strip(),
+            evidence_refs=refs,
+            host_run_id=host_run_id or str(qa.get("host_run_id", "")).strip(),
+            thread_id=thread_id or str(qa.get("thread_id", "")).strip(),
+        )
+        return {**updated, "review_id": review_id, "verdict_status": status}
 
     def summarize(self, scheduler: Any) -> dict[str, Any]:
         """Send the compact batch delta to the supervisor when a host callback exists."""
@@ -402,6 +565,12 @@ class CodexAdapter:
             "ready": not missing,
             "max_concurrency": max_concurrency,
             "warnings": warnings,
+            "quality_review": {
+                "available": self.spawn_subagent is not None,
+                "required_callback": "spawn_subagent",
+                "ready": self.spawn_subagent is not None,
+                "mode": "independent_isolated_qa_agent",
+            },
             "ceo_rollover": {
                 "available": [
                     name for name, callback in (

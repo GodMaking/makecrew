@@ -1,8 +1,11 @@
+import json
 import tempfile
 import unittest
+from pathlib import Path
 
 from ai_company_os import BatchScheduler, CeoContinuityManager, CodexAdapter
 from ai_company_os.bootstrap_cli import main
+from ai_company_os.checkpoint import JsonCheckpointStore, RetryPolicy
 
 
 class CodexAdapterTests(unittest.TestCase):
@@ -53,6 +56,7 @@ class CodexAdapterTests(unittest.TestCase):
         self.assertFalse(report["ready"])
         self.assertEqual(report["missing"], ["spawn_subagent", "send_to_thread"])
         self.assertTrue(report["warnings"])
+        self.assertFalse(report["quality_review"]["ready"])
 
     def test_missing_spawn_callback_leaves_task_waiting_for_host(self):
         adapter = CodexAdapter(send_to_thread=lambda thread_id, prompt: {"status": "accepted"})
@@ -123,6 +127,135 @@ class CodexAdapterTests(unittest.TestCase):
         follow_up = scheduler.dispatch_ready()[0]
         self.assertEqual(follow_up["thread_id"], "codex-existing")
         self.assertTrue(follow_up["thread_reused"])
+
+    def test_codex_host_envelope_preserves_model_run_and_artifact_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            trace_path = Path(directory) / "run.jsonl"
+
+            def spawn(_prompt, metadata):
+                return {
+                    "status": "accepted",
+                    "thread_id": "codex-worker-1",
+                    "agent_id": metadata["agent_id"],
+                    "run_id": "host-run-1",
+                    "model": "codex-model-fixture",
+                }
+
+            adapter = CodexAdapter(spawn_subagent=spawn)
+            scheduler = BatchScheduler(
+                supervisor_id="PM-TEST",
+                run_id="batch-1",
+                trace_path=trace_path,
+                thread_adapter=adapter.open_employee_thread,
+                agent_dispatcher=adapter.dispatch,
+            )
+            scheduler.add("实现并验收", task_id="T1", project="demo")
+
+            dispatch = scheduler.dispatch_ready()[0]
+            completed = adapter.complete(
+                scheduler,
+                "T1",
+                {
+                    "status": "completed",
+                    "run_id": "host-run-complete",
+                    "model": "codex-model-fixture",
+                    "result": {
+                        "summary": "验收通过",
+                        "evidence": ["reports/test.json"],
+                        "artifact_refs": ["dist/app.zip"],
+                    },
+                },
+                usage={"tool_calls": 3},
+            )
+
+            events = [json.loads(line) for line in trace_path.read_text(encoding="utf-8").splitlines()]
+            host_dispatch = next(event for event in events if event["event_type"] == "host_dispatch_result")
+            task_complete = next(event for event in events if event["event_type"] == "task_completed")
+            self.assertEqual(dispatch["host_dispatch"]["run_id"], "host-run-1")
+            self.assertEqual(host_dispatch["host_run_id"], "host-run-1")
+            self.assertEqual(host_dispatch["model"], "codex-model-fixture")
+            self.assertEqual(task_complete["model"], "codex-model-fixture")
+            self.assertEqual(task_complete["artifact_refs"], ["dist/app.zip"])
+            self.assertEqual(completed["usage"]["tool_calls"], 3)
+
+    def test_transient_host_interruption_retries_same_task_and_thread(self):
+        with tempfile.TemporaryDirectory() as directory:
+            trace_path = Path(directory) / "run.jsonl"
+            checkpoint_path = Path(directory) / "checkpoints.json"
+            sent = []
+            accepted_dispatch_keys = set()
+            executed_side_effects = []
+
+            def send(thread_id, prompt):
+                sent.append((thread_id, prompt))
+                marker = '"idempotency_key":"'
+                if marker not in prompt:
+                    raise AssertionError("dispatch prompt lacks an idempotency key")
+                dispatch_key = prompt.split(marker, 1)[1].split('"', 1)[0]
+                if dispatch_key not in accepted_dispatch_keys:
+                    accepted_dispatch_keys.add(dispatch_key)
+                    executed_side_effects.append(dispatch_key)
+                    raise TimeoutError("fixture host interruption")
+                return {"status": "accepted", "run_id": "host-run-retry", "model": "codex-model-fixture"}
+
+            adapter = CodexAdapter(send_to_thread=send)
+            adapter.register_employee(employee_id="ENG-001", project="demo", thread_id="codex-worker")
+            scheduler = BatchScheduler(
+                supervisor_id="PM-TEST",
+                run_id="batch-retry",
+                trace_path=trace_path,
+                thread_adapter=adapter.open_employee_thread,
+                agent_dispatcher=adapter.dispatch,
+            )
+            scheduler.add("修复并验证", task_id="T1", project="demo")
+
+            with self.assertRaisesRegex(TimeoutError, "fixture host interruption"):
+                scheduler.dispatch_ready()
+
+            interrupted = scheduler.snapshot("T1")
+            checkpoint = JsonCheckpointStore(checkpoint_path).save(
+                "T1",
+                "dispatch",
+                {
+                    "run_id": interrupted["run_id"],
+                    "attempt": interrupted["attempt"],
+                    "status": interrupted["status"],
+                    "thread_id": interrupted["thread_id"],
+                },
+                idempotency_key="T1:dispatch:1",
+            )
+            restored = JsonCheckpointStore(checkpoint_path).load_latest("T1")
+            retry = RetryPolicy(max_attempts=2).decision(attempt=1, retryable=True)
+
+            self.assertEqual(checkpoint["state"]["status"], "waiting_host")
+            self.assertEqual(restored["state"]["attempt"], 1)
+            self.assertEqual(retry["action"], "retry")
+            self.assertEqual(retry["resume_from"], "last_checkpoint")
+            self.assertEqual(RetryPolicy(max_attempts=2).decision(attempt=2, retryable=True)["action"], "stop")
+
+            dispatched = scheduler.dispatch_ready()[0]
+            completed = adapter.complete(
+                scheduler,
+                "T1",
+                {
+                    "status": "completed",
+                    "run_id": "host-run-result",
+                    "model": "codex-model-fixture",
+                    "result": {"summary": "恢复后完成", "artifact_refs": ["reports/fix.txt"]},
+                },
+            )
+
+            events = [json.loads(line) for line in trace_path.read_text(encoding="utf-8").splitlines()]
+            starts = [event for event in events if event["event_type"] == "task_started"]
+            self.assertEqual(len(sent), 2)
+            self.assertEqual(len(executed_side_effects), 1)
+            self.assertEqual(sent[0][0], sent[1][0])
+            self.assertEqual(sent[0][1], sent[1][1])
+            self.assertIn('"idempotency_key":"batch-retry:T1"', sent[0][1])
+            self.assertEqual([event["attempt"] for event in starts], [1, 2])
+            self.assertEqual(dispatched["thread_id"], "codex-worker")
+            self.assertEqual(completed["status"], "done")
+            self.assertEqual(completed["artifact_refs"], ["reports/fix.txt"])
 
     def test_isolated_task_always_spawns_a_new_employee_thread(self):
         spawned = []

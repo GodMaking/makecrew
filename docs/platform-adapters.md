@@ -46,6 +46,81 @@ summary = adapter.summarize(scheduler)
 `queued` 及缺失能力名称，不会把计划伪装成已执行。`audit()` 可在启动时检查
 回调是否接通；建议先用 `max_concurrency=3`，再依据宿主限制调整。
 
+### 独立 QA Agent 复核
+
+需把 QA 接入任务完成流程时，宿主在员工结果写入后调用 `request_qa_review()`；QA Agent 使用新隔离线程，不复用执行员工的上下文：
+
+```python
+task = adapter.complete(scheduler, "T1", employee_result)
+review = adapter.request_qa_review(scheduler, "T1")
+# 宿主等待独立 QA Agent 返回结构化 JSON 后：
+checked = adapter.complete_qa_review(
+    scheduler,
+    "T1",
+    {
+        "status": "completed",
+        "run_id": "QA_HOST_RUN_ID",
+        "model": "QA_MODEL",
+        "result": {
+            "status": "passed",  # 或 rework_required / blocked
+            "reason": "逐项验收说明",
+            "evidence_refs": ["reports/qa-evidence.json"],
+        },
+    },
+    review_id=review["review_id"],
+)
+```
+
+`request_qa_review()` 只把验收标准、结构化员工结果和产物引用交给 QA Agent；`passed` 必须有证据引用。复核期间同一任务的下游依赖停留等待；返工时原任务进入 `review`，通过后依赖才可继续。宿主回调缺失、派发异常或 QA 输出结构不合格时，不会写入通过结论；任务留在 QA 待复核状态并保存错误原因。`review_id` 同时作为稳定幂等键，迟到或过期的结果会被拒绝。
+
+该流程由宿主显式调用，不会因仅安装 MakeCrew 就自动创建 Codex 子 Agent。部署前应确认 `spawn_subagent` 已绑定，并在真实宿主完成链路中接入 `request_qa_review()` 与 `complete_qa_review()`；单元测试使用模拟回调，不代表桌面端已连接。
+
+任务包带有稳定的 `idempotency_key`（`run_id:task_id`）。超时后重发同一任务时，
+宿主应按此键去重外部副作用；它代表可重复投递的关联键，不是宿主自动提供的
+exactly-once 保证。回调异常会留下 trace 并把任务置为 `waiting_host`；宿主可以用
+`JsonCheckpointStore` 保存紧凑节点状态，再通过 `RetryPolicy` 决定是否从检查点续作。
+批次状态可由 `BatchScheduler.restore(state_path, ...)` 重建；宿主需重新绑定回调并负责
+外部副作用去重。
+
+当前 `CodexAdapter` 是完整请求/回执边界：宿主应先组装好完整工具参数，再返回
+结构化回执；MakeCrew 当前没有厂商级流式事件解析器，也没有第二个厂商原生模型适配器。
+新增流式或其他厂商适配器时，应为其单独补充增量参数拼接、截断/中断、重复事件去重和最终
+回执映射测试；本节的 Codex 回调测试仅覆盖 Codex 边界，不代表其他协议已验证。
+
+### 规范化增量工具参数
+
+宿主接入支持流式工具调用的模型时，可先把厂商事件映射成统一增量事件，再交给
+`ToolCallDeltaAssembler`。`arguments_delta` 是新增片段，不是累计快照；适配器应显式识别
+厂商事件类型，不能把两种语义混用。`complete=true` 代表该调用的参数流已完整。
+
+```python
+from ai_company_os import ToolCallDeltaAssembler
+
+assembler = ToolCallDeltaAssembler()
+assembler.feed({
+    "event_id": "evt-1",
+    "call_id": "call-7",
+    "name_delta": "search",
+    "arguments_delta": '{"offset":',
+})
+ready_to_route = assembler.feed({
+    "event_id": "evt-2",
+    "call_id": "call-7",
+    "arguments_delta": '0,"limit":10}',
+    "complete": True,
+})
+if ready_to_route is not None:
+    # 宿主在这里做工具策略校验并调用对应工具。
+    pass
+assembler.finish()  # 若流中断且仍有未完成调用，会报告 pending call IDs
+```
+
+事件需带稳定 `event_id` 与 `call_id`。相同 ID、相同内容的事件会去重；同 ID 不同内容会报错。
+多个调用可以交错到达，各自独立累积。参数需在完成事件到达时解析为 JSON 对象，否则不会产出
+可路由调用。该组件只拼装和验证规范化事件，不解析任何厂商协议、不执行工具，也不替代宿主
+的工具调用幂等处理。当前 Codex 回调仍使用完整请求/回执；以下契约供新流式适配器使用，尚不
+表示已接入或验证了第二个模型供应商。
+
 也可以先运行 `makecrew codex-audit --supervisor-id PM-001`，查看当前主管
 身份、已接通的宿主回调、缺失项和并发建议。该检查不创建 Agent、不发送消息，
 适合安装或重启后先做一次连接自检。
