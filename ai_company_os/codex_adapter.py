@@ -23,6 +23,7 @@ OpenEmployeeThread = Callable[[str, str, str, dict[str, Any]], dict[str, Any]]
 OpenSupervisorThread = Callable[[str, dict[str, Any]], dict[str, Any]]
 SetThreadPinned = Callable[[str, bool], Any]
 SetThreadArchived = Callable[[str, bool], Any]
+RuntimeProbe = Callable[[], dict[str, Any]]
 
 
 class CodexHost(Protocol):
@@ -100,6 +101,7 @@ class CodexAdapter:
         open_supervisor_thread: OpenSupervisorThread | None = None,
         set_thread_pinned: SetThreadPinned | None = None,
         set_thread_archived: SetThreadArchived | None = None,
+        runtime_probe: RuntimeProbe | None = None,
         available_tools: list[str] | tuple[str, ...] | set[str] = (),
     ) -> None:
         self.supervisor_id = supervisor_id.strip() or "PM-001"
@@ -110,6 +112,7 @@ class CodexAdapter:
         self.open_supervisor_thread = open_supervisor_thread
         self.set_thread_pinned = set_thread_pinned
         self.set_thread_archived = set_thread_archived
+        self.runtime_probe = runtime_probe
         self.available_tools = tuple(available_tools)
         self._employees: dict[tuple[str, str], CodexAgentRef] = {}
 
@@ -268,7 +271,34 @@ class CodexAdapter:
         else:
             result = host_result
             model = ""
+        validation_error = self._validate_employee_result(result)
+        if validation_error:
+            return scheduler.mark_failed(
+                task_id,
+                reason=f"员工结果契约校验失败：{validation_error}",
+                usage=usage,
+                model=model,
+            )
         return scheduler.mark_done(task_id, result=result, usage=usage, model=model)
+
+    @staticmethod
+    def _validate_employee_result(result: Any) -> str:
+        """Validate the compact employee result before it enters the ledger.
+
+        The scheduler accepts flexible values for portability.  The Codex host
+        boundary is stricter: a completed employee turn must return a JSON
+        object with a non-empty summary and list-shaped evidence fields, so a
+        malformed host response is recorded as a retryable failure rather than
+        being mistaken for successful work.
+        """
+        if not isinstance(result, dict):
+            return "结果必须是 JSON 对象"
+        if not str(result.get("summary", "")).strip():
+            return "缺少非空 summary"
+        for field in ("evidence", "risks", "next_steps", "artifact_refs"):
+            if field in result and result[field] is not None and not isinstance(result[field], (list, tuple)):
+                return f"{field} 必须是数组"
+        return ""
 
     def request_qa_review(self, scheduler: Any, task_id: str) -> dict[str, Any]:
         """Dispatch a separate QA Agent and keep dependents behind the review gate.
@@ -586,4 +616,39 @@ class CodexAdapter:
                     self.set_thread_archived,
                 )),
             },
+            "runtime_probe": {
+                "configured": self.runtime_probe is not None,
+                "status": "not_run",
+                "reason": "调用 probe_runtime() 后才会执行宿主探测" if self.runtime_probe is not None else "宿主未提供非破坏性运行时探测回调",
+            },
         }
+
+    def probe_runtime(self) -> dict[str, Any]:
+        """Run an injected, non-destructive host health probe."""
+        if self.runtime_probe is None:
+            return {
+                "status": "not_configured",
+                "reason": "宿主未提供 runtime_probe 回调",
+            }
+        try:
+            response = self.runtime_probe()
+        except Exception as exc:
+            return {
+                "status": "error",
+                "reason": f"{type(exc).__name__}: {exc}",
+            }
+        if not isinstance(response, dict):
+            return {
+                "status": "invalid",
+                "reason": "runtime_probe 必须返回 JSON 对象",
+            }
+        normalized = dict(response)
+        status = str(normalized.get("status", "")).strip().lower()
+        if status in {"ok", "pass", "passed", "ready", "connected"}:
+            normalized["status"] = "passed"
+        elif status in {"failed", "error", "blocked", "unavailable"}:
+            normalized["status"] = status
+        else:
+            normalized["status"] = "invalid"
+            normalized.setdefault("reason", "runtime_probe.status 必须是 ok、passed、failed 或 blocked")
+        return normalized

@@ -224,6 +224,14 @@ def open_thread(employee_id, project, role):
 
 在 Codex 适配器中，`BatchScheduler.supervisor_id` 表示主管 Agent；`dispatch_ready()` 返回的每个 `task_packet` 就是发给一个员工 Agent 的最小输入。任务包包含 `file_scope`；独立写入任务应映射到独立 Worktree，共享文件范围应保持串行。若提供 `agent_dispatcher(thread_id, task_packet)`，调度器会把任务包直接交给 Codex 原生 Agent，并在 `host_dispatch` 中保留宿主回执。员工完成后，宿主把 `summary`、`evidence`、`risks` 和 `next_steps` 传给 `mark_done(result=...)`，主管通过 `aggregate_results()` 获取紧凑汇总。不要把完整员工历史复制给主管或其他员工。
 
+`CodexAdapter.complete()` 是员工回执的质量边界：宿主回传必须是 JSON 对象，包含非空
+`summary`；`evidence`、`risks`、`next_steps` 和 `artifact_refs`（若存在）必须是数组。
+契约不满足时，适配器会把任务记录为带原因的失败，不写入“已完成”结果，方便有界重试或重新派发。
+
+`CodexAdapter.audit()` 仍是静态检查，不会替宿主创建对话或发送任务。宿主若能提供低副作用的
+`runtime_probe()`，可注入适配器后显式调用 `probe_runtime()`；返回 `passed` 才代表这次探测得到
+运行时回执，`not_configured`、`error` 或 `invalid` 都应继续按待接入处理。
+
 调度器负责依赖图、并发上限、预算、暂停/恢复/取消和状态汇总；适配器负责实际创建对话、发送最小任务包、接收结果并回写 `mark_done()` 或 `mark_failed()`。
 
 ## 工具与 Skill 配置原则

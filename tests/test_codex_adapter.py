@@ -57,6 +57,18 @@ class CodexAdapterTests(unittest.TestCase):
         self.assertEqual(report["missing"], ["spawn_subagent", "send_to_thread"])
         self.assertTrue(report["warnings"])
         self.assertFalse(report["quality_review"]["ready"])
+        self.assertEqual(report["runtime_probe"]["status"], "not_run")
+
+    def test_runtime_probe_is_opt_in_and_normalizes_host_health_status(self):
+        adapter = CodexAdapter(runtime_probe=lambda: {"status": "ok", "host": "codex-fixture"})
+        self.assertEqual(adapter.audit()["runtime_probe"]["status"], "not_run")
+        self.assertEqual(adapter.probe_runtime(), {"status": "passed", "host": "codex-fixture"})
+
+    def test_runtime_probe_reports_callback_failures_without_claiming_readiness(self):
+        adapter = CodexAdapter(runtime_probe=lambda: (_ for _ in ()).throw(TimeoutError("host timeout")))
+        result = adapter.probe_runtime()
+        self.assertEqual(result["status"], "error")
+        self.assertIn("host timeout", result["reason"])
 
     def test_missing_spawn_callback_leaves_task_waiting_for_host(self):
         adapter = CodexAdapter(send_to_thread=lambda thread_id, prompt: {"status": "accepted"})
@@ -307,6 +319,45 @@ class CodexAdapterTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "failed")
         self.assertEqual(result["failure_reason"], "线程超时")
+
+    def test_malformed_employee_result_is_rejected_before_mark_done(self):
+        adapter = CodexAdapter()
+        scheduler = BatchScheduler()
+        scheduler.add("研究用户", task_id="T1", project="demo")
+        scheduler.dispatch_ready()
+
+        result = adapter.complete(
+            scheduler,
+            "T1",
+            {"status": "completed", "result": {"evidence": ["report.md"]}},
+        )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertIn("summary", result["failure_reason"])
+        self.assertIsNone(result["result"])
+
+    def test_malformed_employee_result_lists_are_rejected(self):
+        adapter = CodexAdapter()
+        scheduler = BatchScheduler()
+        scheduler.add("研究用户", task_id="T1", project="demo")
+        scheduler.dispatch_ready()
+
+        result = adapter.complete(
+            scheduler,
+            "T1",
+            {
+                "status": "completed",
+                "result": {
+                    "summary": "完成",
+                    "evidence": "report.md",
+                    "risks": [],
+                    "next_steps": [],
+                },
+            },
+        )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertIn("evidence", result["failure_reason"])
 
     def test_ceo_rollover_uses_verified_host_thread_and_archives_old(self):
         with tempfile.TemporaryDirectory() as directory:
