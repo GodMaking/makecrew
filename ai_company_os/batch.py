@@ -16,6 +16,7 @@ from .router import CORE_EMPLOYEE_PROFILES, EMPLOYEE_PROFILES, route_task
 ThreadAdapter = Callable[[str, str, str], dict[str, Any]]
 AgentDispatcher = Callable[[str, dict[str, Any]], dict[str, Any]]
 TERMINAL = {"done", "failed", "cancelled", "blocked_dependency"}
+BUSY_STATUSES = {"running", "waiting_host"}
 DEFAULT_SUPERVISOR_ID = "PM-001"
 
 
@@ -190,7 +191,7 @@ class BatchScheduler:
         return self._usage["tool_calls"] + sum(
             record["budget"]["tool_calls"]
             for record in self._tasks.values()
-            if record["status"] == "running"
+            if record["status"] in BUSY_STATUSES
         )
 
     @staticmethod
@@ -224,14 +225,14 @@ class BatchScheduler:
 
     def ready(self) -> list[dict[str, Any]]:
         """Return the next tasks that may start, respecting order and limits."""
-        free_slots = self.max_concurrency - sum(record["status"] == "running" for record in self._tasks.values())
+        free_slots = self.max_concurrency - sum(record["status"] in BUSY_STATUSES for record in self._tasks.values())
         if free_slots <= 0:
             return []
         selected: list[dict[str, Any]] = []
-        active = [record for record in self._tasks.values() if record["status"] == "running"]
+        active = [record for record in self._tasks.values() if record["status"] in BUSY_STATUSES]
         reserved = self._reserved_calls()
         for record in self._tasks.values():
-            if len(selected) >= free_slots or record["status"] in TERMINAL or record["status"] in {"running", "paused"}:
+            if len(selected) >= free_slots or record["status"] in TERMINAL or record["status"] in {"running", "waiting_host", "paused"}:
                 continue
             blocked_by = self._dependency_blocked(record)
             if blocked_by:
@@ -263,12 +264,12 @@ class BatchScheduler:
         if not self._budget_available(record):
             record["status"] = "waiting_budget"
             raise ValueError(f"任务超出批次预算：{task_id}")
-        active = [item for item in self._tasks.values() if item["status"] == "running" and item["task_id"] != task_id]
+        active = [item for item in self._tasks.values() if item["status"] in BUSY_STATUSES and item["task_id"] != task_id]
         conflict = self._conflict_reason(record, active)
         if conflict:
             record["status"] = conflict
             raise ValueError(f"任务存在执行冲突：{task_id}")
-        if sum(item["status"] == "running" for item in self._tasks.values()) >= self.max_concurrency:
+        if sum(item["status"] in BUSY_STATUSES for item in self._tasks.values()) >= self.max_concurrency:
             raise ValueError("已达到批次并发上限")
         record["status"] = "running"
         return self.snapshot(task_id)
@@ -348,6 +349,15 @@ class BatchScheduler:
             }
         return {"summary": str(result).strip(), "evidence": [], "risks": [], "next_steps": []}
 
+    def _validate_usage(self, record: dict[str, Any], calls: int) -> None:
+        if calls < 0:
+            raise ValueError("用量不能为负数")
+        task_limit = record["budget"]["tool_calls"]
+        if task_limit > 0 and record["usage"]["tool_calls"] + calls > task_limit:
+            raise ValueError(f"任务超出工具调用预算：{record['task_id']}")
+        if self.total_tool_calls is not None and self._usage["tool_calls"] + calls > self.total_tool_calls:
+            raise ValueError(f"批次超出工具调用预算：{record['task_id']}")
+
     def mark_done(
         self,
         task_id: str,
@@ -361,8 +371,7 @@ class BatchScheduler:
         if record["status"] == "cancelled":
             raise ValueError(f"任务已取消：{task_id}")
         calls = int((usage or {}).get("tool_calls", 0))
-        if calls < 0:
-            raise ValueError("用量不能为负数")
+        self._validate_usage(record, calls)
         record["usage"]["tool_calls"] += calls
         self._usage["tool_calls"] += calls
         record["status"] = "done"
@@ -377,8 +386,7 @@ class BatchScheduler:
         if record["status"] in TERMINAL:
             return self.snapshot(task_id)
         calls = int((usage or {}).get("tool_calls", 0))
-        if calls < 0:
-            raise ValueError("用量不能为负数")
+        self._validate_usage(record, calls)
         record["usage"]["tool_calls"] += calls
         self._usage["tool_calls"] += calls
         record["status"] = "failed"
