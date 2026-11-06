@@ -1,0 +1,5 @@
+recursive-include skills *
+recursive-include docs *
+recursive-include roles *
+recursive-include templates *
+include README.md README_EN.md LICENSE SECURITY.md CHANGELOG.md
