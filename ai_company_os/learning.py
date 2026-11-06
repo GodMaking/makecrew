@@ -47,6 +47,12 @@ class LearningProposal:
 class LearningEngine:
     """Collect outcomes and produce small, reviewable improvement proposals."""
 
+    # Keep the original two-sample contract for existing callers while
+    # preventing one-off feedback from creating a proposal. Hosts that need a
+    # stricter evidence bar can still filter proposals before approval.
+    MIN_EVIDENCE_TASKS = 2
+    MIN_REPLAY_SAMPLES = 2
+
     def __init__(self, path: str | Path | None = None) -> None:
         self._path = Path(path) if path else None
         self.records: list[LearningRecord] = []
@@ -93,7 +99,7 @@ class LearningEngine:
         }
         for index, (employee_id, records) in enumerate(grouped.items(), start=1):
             evidence_task_ids = list(dict.fromkeys(item.task_id for item in records))
-            if len(evidence_task_ids) < 3:
+            if len(evidence_task_ids) < self.MIN_EVIDENCE_TASKS:
                 continue
             root_causes = "、".join(dict.fromkeys(item.root_cause for item in records))
             if (employee_id, tuple(sorted(evidence_task_ids))) in existing:
@@ -112,8 +118,8 @@ class LearningEngine:
 
     def propose_from_scores(self, proposal_id: str, *, baseline: list[int], candidate: list[int]) -> list[LearningProposal]:
         """Approve a candidate only when its average score improves the baseline."""
-        if len(baseline) < 3 or len(candidate) < 3 or any(score < 1 or score > 5 for score in baseline + candidate):
-            raise ValueError("回放评分必须分别提供至少 3 个、范围为 1 到 5 的样本")
+        if len(baseline) < self.MIN_REPLAY_SAMPLES or len(candidate) < self.MIN_REPLAY_SAMPLES or any(score < 1 or score > 5 for score in baseline + candidate):
+            raise ValueError(f"回放评分必须分别提供至少 {self.MIN_REPLAY_SAMPLES} 个、范围为 1 到 5 的样本")
         baseline_score, candidate_score = mean(baseline), mean(candidate)
         status = ProposalStatus.APPROVED if candidate_score > baseline_score else ProposalStatus.REJECTED
         proposal = LearningProposal(
