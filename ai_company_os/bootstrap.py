@@ -5,10 +5,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import shutil
+import sys
 
 from .router import CORE_EMPLOYEE_PROFILES, EMPLOYEE_PROFILES, EmployeeProfile
 from .capabilities import skill_ids_for_employee
 from .skill_audit import audit_skill_directory
+from .storage import atomic_write_json, atomic_write_text, file_lock
 
 
 KNOWN_TOOLS = (
@@ -35,6 +37,17 @@ GLOBAL_INTAKE_BLOCK = f"""{GLOBAL_INTAKE_BEGIN}
 {GLOBAL_INTAKE_END}"""
 
 
+def default_skill_root(workspace: str | Path) -> Path:
+    """Resolve workspace skills first, then source and installed package data."""
+    root = Path(workspace).expanduser().resolve()
+    candidates = (
+        root / "skills",
+        Path(__file__).resolve().parent.parent / "skills",
+        Path(sys.prefix) / "share" / "agentflow-os" / "skills",
+    )
+    return next((candidate for candidate in candidates if candidate.is_dir()), candidates[0])
+
+
 def install_codex_global_intake(codex_home: str | Path) -> dict[str, str | bool]:
     """Install an idempotent MakeCrew intake block without replacing user guidance."""
     root = Path(codex_home).expanduser().resolve()
@@ -59,9 +72,8 @@ def install_codex_global_intake(codex_home: str | Path) -> dict[str, str | bool]
         if agents_path.exists() and existing and not backup_path.exists():
             shutil.copy2(agents_path, backup_path)
             backup_created = True
-        temporary = root / "AGENTS.md.makecrew.tmp"
-        temporary.write_text(updated, encoding="utf-8")
-        temporary.replace(agents_path)
+        with file_lock(agents_path):
+            atomic_write_text(agents_path, updated)
     return {
         "codex_home": str(root),
         "agents_file": str(agents_path),
@@ -135,7 +147,7 @@ def doctor_workspace(
         initialization = {"created_count": "0"}
         initialization_error = str(exc)
     codex_root = Path(codex_home or (Path.home() / ".codex")).expanduser().resolve()
-    skill_root = Path(skills_path or (root / "skills")).expanduser().resolve()
+    skill_root = Path(skills_path).expanduser().resolve() if skills_path else default_skill_root(root)
     registry_path = root / ".makecrew" / "employee-registry.json"
     registry: dict = {}
     registry_status = "pass"
@@ -327,19 +339,19 @@ def initialize_workspace(base_dir: str | Path, *, project: str = "main") -> dict
     created = []
     for path, content in files.items():
         if not path.exists():
-            path.write_text(content, encoding="utf-8")
+            atomic_write_text(path, content)
             created.append(str(path.relative_to(root)))
 
     default_templates = _default_profiles()
     templates_path = crew_dir / "employee-templates.json"
     if not templates_path.exists():
-        templates_path.write_text(json.dumps(default_templates, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        atomic_write_json(templates_path, default_templates)
         created.append(str(templates_path.relative_to(root)))
     registry_path = crew_dir / "employee-registry.json"
     if not registry_path.exists():
         # A fresh install has no employees yet. Templates are opt-in and only
         # become employees after the user reviews and approves a proposal.
-        registry_path.write_text("{}\n", encoding="utf-8")
+        atomic_write_json(registry_path, {})
         created.append(str(registry_path.relative_to(root)))
     else:
         # Upgrade an existing workspace additively. Existing employees,
@@ -356,7 +368,8 @@ def initialize_workspace(base_dir: str | Path, *, project: str = "main") -> dict
                 record["skill_ids"] = template["skill_ids"]
                 changed = True
         if changed:
-            registry_path.write_text(json.dumps(registry, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            with file_lock(registry_path):
+                atomic_write_json(registry_path, registry)
     return {"root": str(root), "project": project_name, "created_count": str(len(created)), "employee_count": str(len(json.loads(registry_path.read_text(encoding="utf-8"))))}
 
 
@@ -409,5 +422,7 @@ def register_employee(
     if employee_id in CORE_EMPLOYEE_PROFILES or employee_id in registry:
         raise ValueError(f"员工 ID 已存在或属于核心岗位：{employee_id}")
     registry[employee_id] = record
-    registry_path.write_text(json.dumps(registry, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    with file_lock(registry_path):
+        atomic_write_json(registry_path, registry)
     return {"employee_id": employee_id, "kind": "custom", "registry": str(registry_path)}
+
