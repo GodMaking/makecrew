@@ -9,6 +9,8 @@ from pathlib import Path
 import time
 from typing import Any, Callable
 
+from .storage import atomic_write_json, file_lock
+
 
 Clock = Callable[[], float]
 
@@ -79,10 +81,8 @@ class CeoContinuityManager:
 
     @staticmethod
     def _write_json(path: Path, payload: dict[str, Any]) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = path.with_suffix(path.suffix + ".tmp")
-        temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        temporary.replace(path)
+        with file_lock(path):
+            atomic_write_json(path, payload)
 
     def _load_state(self) -> dict[str, Any]:
         state = json.loads(self.state_path.read_text(encoding="utf-8"))
@@ -353,3 +353,4 @@ def build_ceo_handoff_prompt(handoff: dict[str, Any]) -> str:
         f"预期标识：{_canonical({key: sorted(value) for key, value in required.items()})}\n"
         f"接班包：{_canonical(handoff)}"
     )
+
