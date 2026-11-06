@@ -355,7 +355,7 @@ def plan_request(
             "需求仍有未回答的实质缺口" if unclear else "宿主工具或外部 Skill 可能尚未接入",
             "公开或不可逆动作需要单独确认" if requires_confirmation else "执行结果需要按验收门禁复核",
         ],
-        "ready": not unclear and not skill_choice_needed and not skill_gap_unresolved,
+        "ready": not unclear and not skill_choice_needed and not skill_gap_unresolved and (not requires_confirmation or confirmed),
         "confirmation_required": requires_confirmation,
         "confirmation_prompt": "请确认以上目标、Skill、工具、交付物和验收标准后再开始执行。",
     }
