@@ -82,7 +82,10 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self) -> None:  # noqa: N802
-        self._respond()
+        # Keep old bookmarked/demo URLs working. New forms use POST so task
+        # text does not normally enter browser history or proxy logs.
+        query = parse_qs(self.path.partition("?")[2])
+        self._respond(query.get("task", [""])[0], query.get("project", [""])[0])
 
     def do_POST(self) -> None:  # noqa: N802
         try:
