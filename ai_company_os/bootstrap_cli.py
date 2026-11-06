@@ -6,7 +6,7 @@ import argparse
 import json
 from pathlib import Path
 
-from .bootstrap import audit_tools, doctor_workspace, initialize_workspace, install_codex_global_intake, register_employee
+from .bootstrap import audit_tools, default_skill_root, doctor_workspace, initialize_workspace, install_codex_global_intake, register_employee
 from .orchestrator import CrewOrchestrator
 from .intake import plan_batch, plan_request
 from .batch import BatchScheduler
@@ -33,10 +33,10 @@ def main(argv: list[str] | None = None) -> int:
     capability_audit = subparsers.add_parser("capability-audit", help="audit built-in employee skill bindings")
 
     skill_audit = subparsers.add_parser("skill-audit", help="validate local SKILL.md metadata and layout")
-    skill_audit.add_argument("--path", default="skills", help="directory containing one subdirectory per Skill")
+    skill_audit.add_argument("--path", default=None, help="directory containing one subdirectory per Skill")
 
     skill_inventory = subparsers.add_parser("skill-inventory", help="list local Skill metadata without loading instructions")
-    skill_inventory.add_argument("--path", default="skills", help="directory containing one subdirectory per Skill")
+    skill_inventory.add_argument("--path", default=None, help="directory containing one subdirectory per Skill")
 
     external_inventory = subparsers.add_parser(
         "external-skill-inventory", help="read external Skill package metadata without loading instructions"
@@ -87,6 +87,7 @@ def main(argv: list[str] | None = None) -> int:
     rag_sync.add_argument("--project", default="", help="project ID for project/task scope")
     rag_sync.add_argument("--actors", default="ceo,manager,employee,task", help="comma-separated allowed actors")
     rag_sync.add_argument("--chunk-chars", type=int, default=1200)
+    rag_sync.add_argument("--max-file-bytes", type=int, default=5_000_000)
 
     rag_query = subparsers.add_parser("rag-query", help="query a persistent RAG index")
     rag_query.add_argument("query", nargs="+", help="search query")
@@ -181,9 +182,9 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "capability-audit":
         result = audit_employee_capabilities()
     elif args.command == "skill-audit":
-        result = audit_skill_directory(args.path)
+        result = audit_skill_directory(args.path or default_skill_root("."))
     elif args.command == "skill-inventory":
-        result = inventory_skill_directory(args.path)
+        result = inventory_skill_directory(args.path or default_skill_root("."))
     elif args.command == "external-skill-inventory":
         result = inventory_external_skill_package(args.path)
     elif args.command == "method-audit":
@@ -219,6 +220,7 @@ def main(argv: list[str] | None = None) -> int:
             project_id=args.project,
             allowed_actors=[item.strip() for item in args.actors.split(",") if item.strip()],
             max_chars=args.chunk_chars,
+            max_file_bytes=args.max_file_bytes,
         )
     elif args.command == "rag-query":
         index = JsonRagIndex(args.index)
@@ -327,3 +329,4 @@ def _read_json_object(path: str, label: str) -> dict:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
