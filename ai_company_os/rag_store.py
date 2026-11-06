@@ -10,6 +10,7 @@ from typing import Any, Iterable
 from urllib.parse import urlparse
 
 from .rag import HybridRetriever, KnowledgeRecord, RetrievalScope
+from .storage import atomic_write_json, file_lock
 
 
 TEXT_SUFFIXES = {".md", ".markdown", ".txt", ".rst", ".json", ".yaml", ".yml", ".csv"}
@@ -54,6 +55,8 @@ def sha256_file(path: Path) -> str:
 
 
 def _chunk_text(text: str, max_chars: int) -> list[str]:
+    if max_chars < 1:
+        raise ValueError("max_chars 必须大于 0")
     paragraphs = [part.strip() for part in text.replace("\r\n", "\n").split("\n\n") if part.strip()]
     chunks: list[str] = []
     current = ""
@@ -101,15 +104,13 @@ class JsonRagIndex:
         self.records = {key: _record_from_dict(value) for key, value in payload.get("records", {}).items()}
 
     def save(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             "version": self.VERSION,
             "files": self.files,
             "records": {key: asdict(value) for key, value in self.records.items()},
         }
-        temporary = self.path.with_suffix(self.path.suffix + ".tmp")
-        temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        temporary.replace(self.path)
+        with file_lock(self.path):
+            atomic_write_json(self.path, payload)
 
     def sync_directory(
         self,
@@ -119,10 +120,15 @@ class JsonRagIndex:
         project_id: str = "",
         allowed_actors: Iterable[str] = ("ceo", "manager", "employee", "task"),
         max_chars: int = 1200,
+        max_file_bytes: int = 5_000_000,
     ) -> dict[str, int | str]:
         root = Path(source_dir).expanduser().resolve()
         if not root.is_dir():
             raise NotADirectoryError(str(root))
+        if max_chars < 1:
+            raise ValueError("max_chars 必须大于 0")
+        if max_file_bytes < 1:
+            raise ValueError("max_file_bytes 必须大于 0")
         actor_tuple = tuple(allowed_actors)
         current_sources: set[str] = set()
         added = changed = skipped = removed = chunks = 0
@@ -131,8 +137,16 @@ class JsonRagIndex:
                 continue
             source = str(path)
             current_sources.add(source)
-            digest = sha256_file(path)
             previous = self.files.get(source)
+            if path.stat().st_size > max_file_bytes:
+                if previous:
+                    for record_id in previous.get("record_ids", []):
+                        self.records.pop(record_id, None)
+                    self.files.pop(source, None)
+                    changed += 1
+                skipped += 1
+                continue
+            digest = sha256_file(path)
             if previous and previous.get("sha256") == digest:
                 skipped += 1
                 continue
@@ -235,3 +249,4 @@ class JsonRagIndex:
         orphan_record_ids = sorted(set(self.records) - referenced)
         issues = len(duplicate_groups) + len(conflict_groups) + len(stale_sources) + len(missing_sources) + len(orphan_record_ids)
         return {"status": "review" if issues else "pass", "duplicate_groups": duplicate_groups, "conflict_groups": conflict_groups, "stale_sources": stale_sources, "missing_sources": missing_sources, "orphan_record_ids": orphan_record_ids, "issue_count": issues}
+
