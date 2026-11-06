@@ -92,7 +92,7 @@ class CodexAdapter:
         self.supervisor_thread_id = supervisor_thread_id.strip()
         self.spawn_subagent = spawn_subagent
         self.send_to_thread = send_to_thread
-        self.open_employee_thread = open_employee_thread
+        self._open_employee_thread_host = open_employee_thread
         self.open_supervisor_thread = open_supervisor_thread
         self.set_thread_pinned = set_thread_pinned
         self.set_thread_archived = set_thread_archived
@@ -141,10 +141,10 @@ class CodexAdapter:
                 "reused": True,
                 "kind": ref.kind,
             }
-        if self.open_employee_thread is None:
+        if self._open_employee_thread_host is None:
             return {"thread_id": "", "agent_id": employee_id, "reused": False, "role": role,
                     "status": "pending_host_adapter", "reason": "codex_open_employee_thread_required"}
-        response = self.open_employee_thread(employee_id, project, role, {
+        response = self._open_employee_thread_host(employee_id, project, role, {
             "supervisor_id": self.supervisor_id,
             "agent_kind": "employee",
         })
@@ -176,7 +176,7 @@ class CodexAdapter:
                     return {**response, "status": response.get("status", "accepted"), "thread_id": thread_id,
                             "agent_id": str(response.get("agent_id", employee_id)), "reused": True, "host": response}
             had_ref = bool(thread_id)
-            opened = self.open_employee_thread(employee_id, project, str(employee.get("role", "任务员工"))) if self.open_employee_thread and not had_ref else {}
+            opened = self.open_employee_thread(employee_id, project, str(employee.get("role", "任务员工"))) if not had_ref else {}
             thread_id = thread_id or str(opened.get("thread_id", "")).strip()
             if thread_id:
                 self.register_employee(employee_id=employee_id, project=project, thread_id=thread_id,
