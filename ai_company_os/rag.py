@@ -184,6 +184,8 @@ class HybridRetriever:
             if not relevant and not new_terms:
                 continue
             size = len(hit.record.content)
+            if size > budget:
+                continue
             if selected and chars + size > budget:
                 continue
             selected.append(hit)
@@ -243,6 +245,8 @@ class HybridRetriever:
             if len(selected) >= max_results:
                 break
             size = len(hit.record.content)
+            if size > max_chars:
+                continue
             if selected and chars + size > max_chars:
                 continue
             selected.append(hit)
