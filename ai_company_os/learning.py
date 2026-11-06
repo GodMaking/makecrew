@@ -47,10 +47,10 @@ class LearningProposal:
 class LearningEngine:
     """Collect outcomes and produce small, reviewable improvement proposals."""
 
-    # Keep the original two-sample contract for existing callers while
-    # preventing one-off feedback from creating a proposal. Hosts that need a
-    # stricter evidence bar can still filter proposals before approval.
-    MIN_EVIDENCE_TASKS = 2
+    # Preserve the existing proposal contract: one concrete failed task can
+    # create a reviewable proposal, but proposals are never applied
+    # automatically. Replay approval still requires multiple samples.
+    MIN_EVIDENCE_TASKS = 1
     MIN_REPLAY_SAMPLES = 2
 
     def __init__(self, path: str | Path | None = None) -> None:
