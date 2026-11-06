@@ -8,6 +8,8 @@ from pathlib import Path
 from time import time
 from typing import Any
 
+from .storage import atomic_write_json, file_lock
+
 
 @dataclass(frozen=True)
 class RetryPolicy:
@@ -62,12 +64,8 @@ class JsonCheckpointStore:
             raise ValueError(f"检查点记录结构无效：{self.path}")
         self._records = [dict(item) for item in records]
 
-    def _save(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {"version": self.VERSION, "records": self._records}
-        temporary = self.path.with_suffix(self.path.suffix + ".tmp")
-        temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        temporary.replace(self.path)
+    def _save_unlocked(self) -> None:
+        atomic_write_json(self.path, {"version": self.VERSION, "records": self._records})
 
     def save(
         self,
@@ -80,21 +78,24 @@ class JsonCheckpointStore:
         task_id, node_id, idempotency_key = task_id.strip(), node_id.strip(), idempotency_key.strip()
         if not task_id or not node_id or not idempotency_key:
             raise ValueError("task_id、node_id 和 idempotency_key 不能为空")
-        existing = next((item for item in self._records if item["idempotency_key"] == idempotency_key), None)
-        if existing is not None:
-            return dict(existing, state=dict(existing["state"]))
-        record = {
-            "checkpoint_id": f"CP-{len(self._records) + 1:06d}",
-            "task_id": task_id,
-            "node_id": node_id,
-            "state": dict(state),
-            "idempotency_key": idempotency_key,
-            "sequence": len(self._records) + 1,
-            "saved_at": time(),
-        }
-        self._records.append(record)
-        self._save()
-        return dict(record, state=dict(record["state"]))
+        scoped_key = f"{task_id}:{node_id}:{idempotency_key}"
+        with file_lock(self.path):
+            self._load()
+            existing = next((item for item in self._records if item["idempotency_key"] == scoped_key), None)
+            if existing is not None:
+                return dict(existing, state=dict(existing["state"]))
+            record = {
+                "checkpoint_id": f"CP-{len(self._records) + 1:06d}",
+                "task_id": task_id,
+                "node_id": node_id,
+                "state": dict(state),
+                "idempotency_key": scoped_key,
+                "sequence": len(self._records) + 1,
+                "saved_at": time(),
+            }
+            self._records.append(record)
+            self._save_unlocked()
+            return dict(record, state=dict(record["state"]))
 
     def load_latest(self, task_id: str) -> dict[str, Any] | None:
         matches = [item for item in self._records if item.get("task_id") == task_id.strip()]
@@ -110,3 +111,4 @@ class JsonCheckpointStore:
             "records": len(self._records),
             "tasks": sorted({str(item.get("task_id", "")) for item in self._records}),
         }
+
