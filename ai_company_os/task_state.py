@@ -9,6 +9,8 @@ from pathlib import Path
 from time import time
 from uuid import uuid4
 
+from .storage import atomic_write_json, file_lock
+
 
 class TaskStatus(StrEnum):
     PENDING = "pending"
@@ -60,10 +62,8 @@ class TaskLedger:
     def _persist(self) -> None:
         if not self._path:
             return
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self._path.with_suffix(self._path.suffix + ".tmp")
-        temporary.write_text(json.dumps(self.export(), ensure_ascii=False, indent=2), encoding="utf-8")
-        temporary.replace(self._path)
+        with file_lock(self._path):
+            atomic_write_json(self._path, self.export())
 
     def _load(self) -> None:
         try:
@@ -152,3 +152,4 @@ class TaskLedger:
     def export(self) -> list[dict]:
         """Return a portable, non-conversational state export."""
         return [asdict(record) for record in self._tasks.values()]
+
