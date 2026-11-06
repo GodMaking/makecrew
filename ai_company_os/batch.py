@@ -286,35 +286,44 @@ class BatchScheduler:
             record = self._get(task_id)
             thread_id = ""
             reused = False
+            host_dispatch = None
             thread_key = None if record.get("isolated_thread") else (
                 record["employee_id"],
                 record["project"],
                 f"{record.get('supervisor_id', '')}:shared",
             )
-            if self.thread_adapter is not None and thread_key is not None:
-                if thread_key in self._threads:
-                    thread_id = self._threads[thread_key]
-                    reused = True
-                else:
-                    response = self.thread_adapter(record["employee_id"], record["project"], record["role"])
-                    thread_id = str(response.get("thread_id", ""))
-                    reused = bool(response.get("reused", False))
-                    if thread_id:
-                        self._threads[thread_key] = thread_id
-            record["thread_id"] = thread_id
-            record["thread_reused"] = reused
-            host_dispatch = None
-            if self.agent_dispatcher is not None:
-                response = self.agent_dispatcher(thread_id, record["task_packet"])
-                host_dispatch = response if isinstance(response, dict) else {"status": "accepted", "result": response}
-                if str(host_dispatch.get("status", "")).lower() in {"queued", "blocked", "waiting"}:
-                    record["status"] = "waiting_host"
-                dispatched_thread_id = str(host_dispatch.get("thread_id", "")).strip()
-                if dispatched_thread_id and not record["thread_id"]:
-                    record["thread_id"] = dispatched_thread_id
-                    record["thread_reused"] = bool(host_dispatch.get("reused", False))
-                    if thread_key is not None:
-                        self._threads[thread_key] = dispatched_thread_id
+            try:
+                if self.thread_adapter is not None and thread_key is not None:
+                    if thread_key in self._threads:
+                        thread_id = self._threads[thread_key]
+                        reused = True
+                    else:
+                        response = self.thread_adapter(record["employee_id"], record["project"], record["role"])
+                        thread_id = str(response.get("thread_id", ""))
+                        reused = bool(response.get("reused", False))
+                        if thread_id:
+                            self._threads[thread_key] = thread_id
+                record["thread_id"] = thread_id
+                record["thread_reused"] = reused
+                if self.agent_dispatcher is not None:
+                    response = self.agent_dispatcher(thread_id, record["task_packet"])
+                    host_dispatch = response if isinstance(response, dict) else {"status": "accepted", "result": response}
+                    host_status = str(host_dispatch.get("status", "")).lower()
+                    if host_status in {"queued", "blocked", "waiting"}:
+                        record["status"] = "waiting_host"
+                    elif host_status in {"failed", "error", "cancelled"}:
+                        record["status"] = "failed"
+                        record["failure_reason"] = str(host_dispatch.get("error", host_dispatch.get("reason", "宿主派发失败"))).strip()
+                    dispatched_thread_id = str(host_dispatch.get("thread_id", "")).strip()
+                    if dispatched_thread_id and not record["thread_id"]:
+                        record["thread_id"] = dispatched_thread_id
+                        record["thread_reused"] = bool(host_dispatch.get("reused", False))
+                        if thread_key is not None:
+                            self._threads[thread_key] = dispatched_thread_id
+            except Exception as exc:
+                record["status"] = "failed"
+                record["failure_reason"] = f"宿主派发异常：{type(exc).__name__}: {exc}"
+                host_dispatch = {"status": "failed", "error": record["failure_reason"]}
             dispatched.append({
                 "task_id": task_id,
                 "employee_id": record["employee_id"],
@@ -497,3 +506,4 @@ class BatchScheduler:
             "overview": self.overview(),
             "dispatch_policy": "reuse_existing_then_create_missing_conversations",
         }
+
