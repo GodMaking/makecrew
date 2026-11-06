@@ -12,6 +12,8 @@ import json
 from pathlib import Path
 from typing import Any, Callable
 
+from .storage import atomic_write_json, file_lock
+
 from .bootstrap import initialize_workspace
 from .router import CORE_EMPLOYEE_PROFILES, EMPLOYEE_PROFILES, route_task
 from .capabilities import skill_ids_for_employee, tool_policy_for_employee
@@ -35,7 +37,8 @@ class CrewOrchestrator:
         return json.loads(self.registry_path.read_text(encoding="utf-8"))
 
     def _write_registry(self, registry: dict[str, dict[str, Any]]) -> None:
-        self.registry_path.write_text(json.dumps(registry, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        with file_lock(self.registry_path):
+            atomic_write_json(self.registry_path, registry)
 
     @staticmethod
     def _active(record: dict[str, Any]) -> bool:
@@ -130,6 +133,14 @@ class CrewOrchestrator:
         if isinstance(result, dict):
             return {"employee_id": employee_id, **result}
         return {"employee_id": employee_id, "status": "completed", "result": result}
+
+    @staticmethod
+    def _rag_actor(employee_id: str) -> str:
+        if employee_id == "CEO-001":
+            return "ceo"
+        if employee_id == "PM-001":
+            return "manager"
+        return "employee"
 
     def dispatch(
         self,
@@ -299,6 +310,7 @@ class CrewOrchestrator:
                 assignment["employee_id"],
                 project_ids=(project,) if project else (),
                 memory_scope=assignment.get("memory_scope", "project"),
+                actor=self._rag_actor(assignment["employee_id"]),
             )
             employee_record = registry.get(assignment["employee_id"], {})
             effective_tools = list(employee_record.get("tools", assignment.get("tools", [])))
@@ -376,3 +388,4 @@ class CrewOrchestrator:
         record["status"] = "archived"
         self._write_registry(registry)
         return {"employee_id": employee_id, **record}
+
