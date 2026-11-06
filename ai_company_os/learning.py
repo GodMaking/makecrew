@@ -13,6 +13,8 @@ from pathlib import Path
 from statistics import mean
 from time import time
 
+from .storage import atomic_write_json, file_lock
+
 
 class ProposalStatus(StrEnum):
     PROPOSED = "proposed"
@@ -55,11 +57,9 @@ class LearningEngine:
     def _persist(self) -> None:
         if not self._path:
             return
-        self._path.parent.mkdir(parents=True, exist_ok=True)
         payload = {"records": [asdict(item) for item in self.records], "proposals": [asdict(item) for item in self.proposals]}
-        temporary = self._path.with_suffix(self._path.suffix + ".tmp")
-        temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-        temporary.replace(self._path)
+        with file_lock(self._path):
+            atomic_write_json(self._path, payload)
 
     def _load(self) -> None:
         try:
@@ -92,8 +92,10 @@ class LearningEngine:
             if proposal.scope == "employee"
         }
         for index, (employee_id, records) in enumerate(grouped.items(), start=1):
+            evidence_task_ids = list(dict.fromkeys(item.task_id for item in records))
+            if len(evidence_task_ids) < 3:
+                continue
             root_causes = "、".join(dict.fromkeys(item.root_cause for item in records))
-            evidence_task_ids = [item.task_id for item in records]
             if (employee_id, tuple(sorted(evidence_task_ids))) in existing:
                 continue
             proposal = LearningProposal(
@@ -110,8 +112,8 @@ class LearningEngine:
 
     def propose_from_scores(self, proposal_id: str, *, baseline: list[int], candidate: list[int]) -> list[LearningProposal]:
         """Approve a candidate only when its average score improves the baseline."""
-        if not baseline or not candidate or any(score < 1 or score > 5 for score in baseline + candidate):
-            raise ValueError("回放评分必须是 1 到 5 的非空列表")
+        if len(baseline) < 3 or len(candidate) < 3 or any(score < 1 or score > 5 for score in baseline + candidate):
+            raise ValueError("回放评分必须分别提供至少 3 个、范围为 1 到 5 的样本")
         baseline_score, candidate_score = mean(baseline), mean(candidate)
         status = ProposalStatus.APPROVED if candidate_score > baseline_score else ProposalStatus.REJECTED
         proposal = LearningProposal(
@@ -130,3 +132,4 @@ class LearningEngine:
 
     def export(self) -> dict[str, list[dict]]:
         return {"records": [asdict(item) for item in self.records], "proposals": [asdict(item) for item in self.proposals]}
+
