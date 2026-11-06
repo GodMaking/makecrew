@@ -11,6 +11,8 @@ from dataclasses import dataclass, field, asdict
 from pathlib import Path
 import json
 
+from .storage import atomic_write_json, file_lock
+
 
 @dataclass
 class ProjectNode:
@@ -49,10 +51,8 @@ class ProjectControlTower:
     def _save(self) -> None:
         if not self.path:
             return
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(self.path.suffix + ".tmp")
-        tmp.write_text(json.dumps(self.snapshot(), ensure_ascii=False, indent=2), encoding="utf-8")
-        tmp.replace(self.path)
+        with file_lock(self.path):
+            atomic_write_json(self.path, self.snapshot())
 
     def add_node(self, node: ProjectNode) -> dict:
         if node.node_id in self.nodes:
@@ -124,3 +124,4 @@ class ProjectControlTower:
 
     def _assert_acyclic(self) -> None:
         self._topological_order()
+
