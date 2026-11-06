@@ -183,11 +183,31 @@ class HybridRetriever:
             relevant = hit.score >= threshold
             if not relevant and not new_terms:
                 continue
+            available = budget - chars
+            if available <= 0:
+                continue
             size = len(hit.record.content)
-            if size > budget:
-                continue
-            if selected and chars + size > budget:
-                continue
+            if size > available:
+                # Preserve recall for a relevant oversized record while still
+                # respecting the caller's context budget.
+                hit = RetrievalHit(
+                    record=KnowledgeRecord(
+                        record_id=hit.record.record_id,
+                        content=hit.record.content[:available],
+                        source=hit.record.source,
+                        title=hit.record.title,
+                        scope=hit.record.scope,
+                        project_id=hit.record.project_id,
+                        allowed_actors=hit.record.allowed_actors,
+                        status=hit.record.status,
+                        evidence=hit.record.evidence,
+                        updated_at=hit.record.updated_at,
+                        tags=hit.record.tags,
+                    ),
+                    score=hit.score,
+                    matched_terms=hit.matched_terms,
+                )
+                size = available
             selected.append(hit)
             chars += size
             covered.update(hit.matched_terms)
@@ -244,11 +264,29 @@ class HybridRetriever:
         for hit in hits:
             if len(selected) >= max_results:
                 break
+            available = max_chars - chars
+            if available <= 0:
+                continue
             size = len(hit.record.content)
-            if size > max_chars:
-                continue
-            if selected and chars + size > max_chars:
-                continue
+            if size > available:
+                hit = RetrievalHit(
+                    record=KnowledgeRecord(
+                        record_id=hit.record.record_id,
+                        content=hit.record.content[:available],
+                        source=hit.record.source,
+                        title=hit.record.title,
+                        scope=hit.record.scope,
+                        project_id=hit.record.project_id,
+                        allowed_actors=hit.record.allowed_actors,
+                        status=hit.record.status,
+                        evidence=hit.record.evidence,
+                        updated_at=hit.record.updated_at,
+                        tags=hit.record.tags,
+                    ),
+                    score=hit.score,
+                    matched_terms=hit.matched_terms,
+                )
+                size = available
             selected.append(hit)
             chars += size
         return selected
@@ -272,3 +310,4 @@ class HostRagAdapter(Protocol):
     def list_records(self, namespace: str) -> Iterable[KnowledgeRecord]: ...
 
     def search(self, query: str, scope: RetrievalScope) -> list[RetrievalHit]: ...
+
